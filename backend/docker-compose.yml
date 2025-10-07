@@ -2,12 +2,12 @@ version: "3.9"
 
 services:
   kds-backend:
-    build: ./backend            # Dockerfile is inside backend/
+    build: .             # use current directory
     container_name: kds-backend
     ports:
-      - "3001:3001"            # Updated port
+      - "3001:3001"      # Updated port
     env_file:
-      - ./backend/.env         # Load all environment variables from your .env
+      - ./.env           # use current directory
     depends_on:
       - redis
     restart: unless-stopped
