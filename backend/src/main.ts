@@ -13,6 +13,8 @@ async function bootstrap() {
       'http://localhost:3000',
       'http://localhost:5173',
       'http://localhost:5174',
+      'https://kds-api.cocoeats.uk',
+    'https://kds.cocoeats.uk', 
     ],
     credentials: true,
   });
