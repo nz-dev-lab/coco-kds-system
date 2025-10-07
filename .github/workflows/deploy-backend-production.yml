@@ -1,0 +1,84 @@
+name: Deploy KDS Backend to Production
+
+on:
+  push:
+    branches:
+      - backend-production
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend-production.yml'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🚀 Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "📥 Pulling latest code..."
+            cd /var/www/kds-api/backend
+            
+            # Stash any local changes (just in case)
+            git stash
+            
+            # Pull latest from backend-production
+            git pull origin backend-production
+            
+            echo "🐳 Rebuilding Docker container..."
+            # Stop and rebuild
+            sudo docker-compose down
+            sudo docker-compose up -d --build
+            
+            # Clean up unused images
+            sudo docker image prune -af
+            
+            echo "✅ Deployment complete!"
+            
+      - name: 🏥 Health Check
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Wait for container to start
+            echo "⏳ Waiting for container to start..."
+            sleep 10
+            
+            # Check container status
+            if sudo docker ps | grep -q kds-backend; then
+              echo "✅ Container is running"
+            else
+              echo "❌ Container failed to start"
+              sudo docker logs kds-backend --tail 50
+              exit 1
+            fi
+            
+            # Check API health (if you have health endpoint)
+            echo "🔍 Checking API health..."
+            if curl -f -s https://kds-api.cocoeats.uk > /dev/null; then
+              echo "✅ API is responding"
+            else
+              echo "⚠️  API not responding yet (might need more time)"
+            fi
+            
+            # Show recent logs
+            echo "📋 Recent logs:"
+            sudo docker logs kds-backend --tail 20
+            
+      - name: 📢 Notify on Success
+        if: success()
+        run: |
+          echo "::notice::✅ Backend deployed successfully to production!"
+          
+      - name: 📢 Notify on Failure
+        if: failure()
+        run: |
+          echo "::error::❌ Deployment failed! Check the logs above."
