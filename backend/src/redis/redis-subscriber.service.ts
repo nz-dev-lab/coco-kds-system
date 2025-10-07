@@ -178,15 +178,15 @@ export class RedisSubscriberService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`🎯 Routing event "${eventName}" for restaurant ${restaurantId}`);
 
     // Route based on Laravel event class name
-    if (eventName.includes('ordercreated') || eventName.includes('new')) {
-      this.handleNewOrder(restaurantId, data);
-    } else if (eventName.includes('orderupdated') || eventName.includes('statuschanged')) {
-      this.handleOrderUpdated(restaurantId, data);
-    } else {
-      // Default: treat as order updated
-      this.logger.log(`Unknown event type "${eventName}", treating as order:updated`);
-      this.handleOrderUpdated(restaurantId, data);
-    }
+    if (eventName.includes('order.created') || eventName.includes('ordercreated') || eventName.includes('new')) {
+    this.handleNewOrder(restaurantId, data);
+  } else if (eventName.includes('order.updated') || eventName.includes('orderupdated') || eventName.includes('statuschanged')) {
+    this.handleOrderUpdated(restaurantId, data);
+  } else {
+    // Default: treat as order updated
+    this.logger.log(`Unknown event type "${eventName}", treating as order:updated`);
+    this.handleOrderUpdated(restaurantId, data);
+  }
   }
 
   private handleNewOrder(restaurantId: number, orderData: any) {
