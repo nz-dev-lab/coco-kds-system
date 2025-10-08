@@ -10,6 +10,9 @@ function App() {
         <p className="text-xl text-gray-400">
           Electron + React + Tailwind - Ready! ✅
         </p>
+        <p className="text-sm text-gray-500 mt-2 px-3 py-1 bg-blue-600 rounded inline-block">
+          v1.0.1 - Auto-Update Improvements
+        </p>
         <div className="mt-8 p-6 order-card max-w-md mx-auto">
           <p className="text-lg">
             Backend API: <span className="text-kds-confirmed">{import.meta.env.VITE_API_URL}</span>

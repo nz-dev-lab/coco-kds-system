@@ -8,11 +8,27 @@ const isDev = process.env.NODE_ENV === 'development';
 
 // Configure auto-updater (only in production)
 if (!isDev) {
-  autoUpdater.checkForUpdatesAndNotify();
-  
+  // Explicitly configure the update source
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'nz-dev-lab',
+    repo: 'coco-kds-system',
+  });
+
+  // Don't auto-download, let user decide
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  // Initial check on startup
+  app.whenReady().then(() => {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates();
+    }, 3000); // Wait 3 seconds after app starts
+  });
+
   // Check for updates every 4 hours
   setInterval(() => {
-    autoUpdater.checkForUpdatesAndNotify();
+    autoUpdater.checkForUpdates();
   }, 4 * 60 * 60 * 1000);
 }
 
@@ -35,31 +51,57 @@ function createWindow() {
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
+    console.log('🔧 Development mode - Loading from localhost:5173');
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    console.log('🚀 Production mode - Loading from local files');
   }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 
-  // Auto-updater events
+  // Setup auto-updater events
   if (!isDev && mainWindow) {
     setupAutoUpdater(mainWindow);
   }
 }
 
 function setupAutoUpdater(window: BrowserWindow) {
-  autoUpdater.on('update-available', () => {
-    window.webContents.send('update_available');
+  autoUpdater.on('checking-for-update', () => {
+    console.log('🔍 Checking for updates...');
   });
 
-  autoUpdater.on('update-downloaded', () => {
-    window.webContents.send('update_downloaded');
+  autoUpdater.on('update-available', (info) => {
+    console.log('✅ Update available:', info.version);
+    window.webContents.send('update_available', info);
+    
+    // Automatically start download
+    autoUpdater.downloadUpdate();
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('✓ App is up to date:', info.version);
   });
 
   autoUpdater.on('error', (error) => {
-    console.error('Auto-updater error:', error);
+    console.error('❌ Auto-updater error:', error.message);
+    // Don't crash the app, just log the error
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`📥 Download progress: ${Math.round(progress.percent)}%`);
+    window.webContents.send('update_progress', progress);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('✅ Update downloaded:', info.version);
+    window.webContents.send('update_downloaded', info);
+    
+    // Optional: Auto-install after 30 seconds
+    // setTimeout(() => {
+    //   autoUpdater.quitAndInstall();
+    // }, 30000);
   });
 }
 
