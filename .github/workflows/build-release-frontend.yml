@@ -39,6 +39,10 @@ jobs:
         working-directory: ./frontend
         run: npm run electron:build
       
+      - name: List release files
+        working-directory: ./frontend
+        run: ls -la release/
+      
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -47,7 +51,7 @@ jobs:
             frontend/release/*.exe
             frontend/release/*.dmg
             frontend/release/*.AppImage
-            frontend/release/*.yml
+            frontend/release/latest*.yml
           if-no-files-found: ignore
   
   release:
