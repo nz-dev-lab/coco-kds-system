@@ -12,7 +12,7 @@ if (!isDev) {
   autoUpdater.setFeedURL({
     provider: 'github',
     owner: 'nz-dev-lab',
-    repo: 'coco-kds-system',
+    repo: 'coco-kds-releases',
   });
 
   // Don't auto-download, let user decide

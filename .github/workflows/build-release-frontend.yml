@@ -85,13 +85,8 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -100,12 +95,14 @@ jobs:
       - name: Display structure
         run: ls -R artifacts
       
-      - name: Create GitHub Release
+      - name: Create GitHub Release in PUBLIC repo
         uses: softprops/action-gh-release@v1
         with:
           files: artifacts/**/*
           draft: false
           prerelease: false
           generate_release_notes: true
+          repository: nz-dev-lab/coco-kds-releases  # ← PUBLIC REPO
+          tag_name: ${{ github.ref_name }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}  # ← YOUR PAT

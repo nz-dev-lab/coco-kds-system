@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nz-dev-lab/coco-kds-system"
+    "url": "https://github.com/nz-dev-lab/coco-kds-releases"
   },
   "scripts": {
     "dev": "npm run build:electron && concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
