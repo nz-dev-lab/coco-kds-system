@@ -4,3 +4,13 @@ dist/
 .env.local
 *.log
 .DS_Store
+Memory.md
+
+# Frontend build outputs
+frontend/dist/
+frontend/dist-electron/
+frontend/release/
+
+# Backend build outputs (if any)
+backend/dist/
+backend/build/
