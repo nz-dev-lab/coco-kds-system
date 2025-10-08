@@ -3,9 +3,7 @@ name: Build and Release KDS Frontend
 on:
   push:
     tags:
-      - 'frontend-v*.*.*'  # Triggers on tags like frontend-v1.0.0
-    paths:
-      - 'frontend/**'
+      - 'frontend-v*.*.*'
 
 jobs:
   build:
@@ -42,6 +40,9 @@ jobs:
         run: npm run electron:build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EP_DRAFT: false
+          EP_PRE_RELEASE: false
+          PUBLISH: never  # Prevent electron-builder from publishing
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

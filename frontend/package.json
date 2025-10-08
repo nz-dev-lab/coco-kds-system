@@ -5,6 +5,10 @@
   "main": "dist-electron/main.js",
   "author": "Nz-Dev-Lab",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nz-dev-lab/coco-kds-system"
+  },
   "scripts": {
     "dev": "npm run build:electron && concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
@@ -50,11 +54,6 @@
     ],
     "extraMetadata": {
       "main": "dist-electron/main.js"
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "nz-dev-lab",
-      "repo": "coco-kds-system"
     },
     "mac": {
       "target": ["dmg"],
