@@ -39,17 +39,45 @@ jobs:
         working-directory: ./frontend
         run: npm run electron:build
       
-      - name: List release files
+      - name: List release files (Unix)
+        if: runner.os != 'Windows'
         working-directory: ./frontend
-        run: ls -la release/
+        run: ls -lah release/
       
-      - name: Upload artifacts
+      - name: List release files (Windows)
+        if: runner.os == 'Windows'
+        working-directory: ./frontend
+        run: dir release\
+        shell: cmd
+      
+      - name: Upload Windows artifacts
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: kds-${{ matrix.os }}
+          name: kds-windows-latest
           path: |
             frontend/release/*.exe
+            frontend/release/*.blockmap
+            frontend/release/latest*.yml
+          if-no-files-found: ignore
+      
+      - name: Upload macOS artifacts
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kds-macos-latest
+          path: |
             frontend/release/*.dmg
+            frontend/release/*.zip
+            frontend/release/latest*.yml
+          if-no-files-found: ignore
+      
+      - name: Upload Linux artifacts
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kds-ubuntu-latest
+          path: |
             frontend/release/*.AppImage
             frontend/release/latest*.yml
           if-no-files-found: ignore
@@ -75,11 +103,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            artifacts/**/*.exe
-            artifacts/**/*.dmg
-            artifacts/**/*.AppImage
-            artifacts/**/*.yml
+          files: artifacts/**/*
           draft: false
           prerelease: false
           generate_release_notes: true
