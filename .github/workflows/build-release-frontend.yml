@@ -87,6 +87,23 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Checkout public releases repo
+        uses: actions/checkout@v4
+        with:
+          repository: nz-dev-lab/coco-kds-releases
+          token: ${{ secrets.RELEASES_PAT }}
+          fetch-depth: 0
+      
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Create and push tag to public repo
+        run: |
+          git tag -f ${{ github.ref_name }}
+          git push -f origin ${{ github.ref_name }}
+      
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -102,7 +119,7 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          repository: nz-dev-lab/coco-kds-releases  # ← PUBLIC REPO
+          repository: nz-dev-lab/coco-kds-releases
           tag_name: ${{ github.ref_name }}
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}  # ← YOUR PAT
+          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
