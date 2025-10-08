@@ -38,11 +38,6 @@ jobs:
       - name: Build Electron application
         working-directory: ./frontend
         run: npm run electron:build
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EP_DRAFT: false
-          EP_PRE_RELEASE: false
-          PUBLISH: never  # Prevent electron-builder from publishing
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -84,6 +79,5 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
