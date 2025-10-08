@@ -10,8 +10,8 @@ function App() {
         <p className="text-xl text-gray-400">
           Electron + React + Tailwind - Ready! ✅
         </p>
-        <p className="text-sm text-gray-500 mt-2 px-3 py-1 bg-blue-600 rounded inline-block">
-          v1.0.1 - Auto-Update Improvements
+        <p className="text-sm text-gray-500 mt-2 px-3 py-1 bg-green-600 rounded inline-block animate-pulse">
+          ✨ v1.0.2 - AUTO-UPDATE TEST SUCCESS! ✨
         </p>
         <div className="mt-8 p-6 order-card max-w-md mx-auto">
           <p className="text-lg">
@@ -19,6 +19,9 @@ function App() {
           </p>
           <p className="text-lg mt-2">
             WebSocket: <span className="text-kds-cooking">{import.meta.env.VITE_WS_URL}</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-4">
+            If you see this green badge, auto-update worked! 🎉
           </p>
         </div>
       </div>
