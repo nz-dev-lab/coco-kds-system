@@ -12,6 +12,21 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { Restaurant } from '../auth/restaurant.entity';
 import { OrdersGateway } from './orders/orders.gateway';
 
+
+interface DeliveryAddress {
+  contact_person_name: string;
+  contact_person_number: string;
+  contact_person_email?: string;
+  address_type: string;
+  address: string;
+  floor?: string | null;
+  road?: string | null;
+  house?: string | null;
+  longitude?: string;
+  latitude?: string;
+}
+
+
 @Injectable()
 export class OrdersService {
   private readonly VALID_TRANSITIONS = {
@@ -136,32 +151,52 @@ if (updatedOrder) {
   }
 
   private formatOrder(order: Order) {
-    return {
-      id: order.id,
-      restaurant_id: order.restaurant_id,
-      order_status: order.order_status,
-      order_type: order.order_type,
-      payment_method: order.payment_method,
-      order_amount: order.order_amount,
-      processing_time: order.processing_time,
-      order_note: order.order_note,
-      delivery_instruction: order.delivery_instruction,
-      delivery_man_id: order.delivery_man_id,
-      created_at: order.created_at,
-      schedule_at: order.schedule_at,
-      order_age_minutes: this.calculateOrderAge(order.created_at),
-      is_scheduled: order.schedule_at ? new Date(order.schedule_at) > new Date() : false,
-      status_timestamps: {
-        pending: order.pending,
-        confirmed: order.confirmed,
-        processing: order.processing,
-        handover: order.handover,
-        delivered: order.delivered,
-      },
-      items: order.details.map((detail) => this.formatOrderDetail(detail)),
-      item_count: order.details.reduce((sum, d) => sum + d.quantity, 0),
-    };
+  // Parse delivery_address to extract customer info
+  let customerName: string | null = null;
+  let parsedDeliveryAddress: DeliveryAddress | null = null;
+  
+  if (order.delivery_address) {
+    try {
+      const parsed = typeof order.delivery_address === 'string'
+        ? JSON.parse(order.delivery_address)
+        : order.delivery_address;
+      
+      // Type assertion after parsing
+      parsedDeliveryAddress = parsed as DeliveryAddress;
+      customerName = parsedDeliveryAddress?.contact_person_name || null;
+    } catch (e) {
+      console.warn(`Failed to parse delivery_address for order ${order.id}:`, e);
+    }
   }
+
+  return {
+    id: order.id,
+    restaurant_id: order.restaurant_id,
+    order_status: order.order_status,
+    order_type: order.order_type,
+    payment_method: order.payment_method,
+    order_amount: order.order_amount,
+    processing_time: order.processing_time,
+    order_note: order.order_note,
+    delivery_instruction: order.delivery_instruction,
+    delivery_man_id: order.delivery_man_id,
+    created_at: order.created_at,
+    schedule_at: order.schedule_at,
+    order_age_minutes: this.calculateOrderAge(order.created_at),
+    is_scheduled: order.schedule_at ? new Date(order.schedule_at) > new Date() : false,
+    customer_name: customerName,
+    delivery_address: parsedDeliveryAddress,
+    status_timestamps: {
+      pending: order.pending,
+      confirmed: order.confirmed,
+      processing: order.processing,
+      handover: order.handover,
+      delivered: order.delivered,
+    },
+    items: order.details.map((detail) => this.formatOrderDetail(detail)),
+    item_count: order.details.reduce((sum, d) => sum + d.quantity, 0),
+  };
+}
 
   private formatOrderDetail(detail: OrderDetail) {
     const foodInfo = this.parseJSON(detail.food_details);
