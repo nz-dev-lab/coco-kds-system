@@ -33,6 +33,9 @@ export class Order {
   @Column({ type: 'text', nullable: true })
   delivery_instruction: string;
 
+  @Column({ type: 'text', nullable: true })
+  delivery_address: string;
+
   // Status timestamps
   @Column({ type: 'timestamp', nullable: true })
   pending: Date;
