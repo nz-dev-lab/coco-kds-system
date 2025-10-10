@@ -225,15 +225,26 @@ if (updatedOrder) {
   }
 
 private calculateOrderAge(createdAt: Date): number {
-  const now = DateTime.now().setZone('UTC');
+  const now = DateTime.now();
   
-  // MySQL timestamps are ALREADY in UTC (thanks to TypeORM timezone: 'Z')
-  // So just parse them as UTC, don't treat them as London time
-  const orderTime = DateTime.fromJSDate(new Date(createdAt), { 
-    zone: 'UTC'  // ← Changed from 'Europe/London' to 'UTC'
-  });
+  // Parse what's in the database (stored as Europe/London time)
+  // by treating the UTC timestamp as if it were London local time
+  const storedValue = DateTime.fromJSDate(new Date(createdAt));
   
-  const diff = now.diff(orderTime, 'minutes');
+  // Figure out what timezone offset London had at that moment
+  const londonAtThatTime = DateTime.fromObject({
+    year: storedValue.year,
+    month: storedValue.month,
+    day: storedValue.day,
+    hour: storedValue.hour,
+    minute: storedValue.minute,
+    second: storedValue.second
+  }, { zone: 'Europe/London' });
+  
+  // Convert to actual UTC
+  const actualUTC = londonAtThatTime.toUTC();
+  
+  const diff = now.diff(actualUTC, 'minutes');
   return Math.floor(diff.minutes);
 }
 
