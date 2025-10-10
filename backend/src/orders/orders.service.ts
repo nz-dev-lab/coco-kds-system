@@ -13,7 +13,7 @@ import { Restaurant } from '../auth/restaurant.entity';
 import { OrdersGateway } from './orders/orders.gateway';
 
 
-interface DeliveryAddress {
+export interface DeliveryAddress {
   contact_person_name: string;
   contact_person_number: string;
   contact_person_email?: string;
