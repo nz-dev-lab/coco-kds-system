@@ -23,6 +23,7 @@ import { RedisModule } from './redis/redis.module';
         autoLoadEntities: true,
         synchronize: false,
         logging: configService.get<string>('NODE_ENV') === 'development',
+        timezone: 'Z',  // ← ADD THIS LINE - Forces UTC interpretation
         extra: {
           connectionLimit: 3,
         },
