@@ -11,7 +11,7 @@ import { DeliveryMan } from './entities/delivery-main.entity';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { Restaurant } from '../auth/restaurant.entity';
 import { OrdersGateway } from './orders/orders.gateway';
-
+import { DateTime } from 'luxon';
 
 export interface DeliveryAddress {
   contact_person_name: string;
@@ -225,10 +225,16 @@ if (updatedOrder) {
   }
 
   private calculateOrderAge(createdAt: Date): number {
-    const now = new Date();
-    const diff = now.getTime() - new Date(createdAt).getTime();
-    return Math.floor(diff / 60000);
-  }
+  const now = DateTime.now().setZone('UTC');
+  
+  // Parse MySQL timestamp as Europe/London time, then convert to UTC
+  const orderTime = DateTime.fromJSDate(new Date(createdAt), { 
+    zone: 'Europe/London' 
+  }).setZone('UTC');
+  
+  const diff = now.diff(orderTime, 'minutes');
+  return Math.floor(diff.minutes);
+}
 
  async getAvailableDeliveryMen(restaurantId: number, zoneId: number) {
   return this.deliveryManRepo
