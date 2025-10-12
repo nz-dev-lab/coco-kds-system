@@ -4,16 +4,551 @@
 
 @layer base {
   body {
-    @apply bg-kds-bg text-white antialiased;
+    @apply bg-kds-bg text-kds-text-primary antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 
+                 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 
+                 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Monospace fonts for numbers, IDs, timers */
+  .font-mono, 
+  code, 
+  kbd, 
+  pre,
+  .order-id,
+  .timer,
+  .quantity {
+    font-family: ui-monospace, 'SF Mono', Monaco, 'Cascadia Code', 
+                 'Roboto Mono', Consolas, 'Courier New', monospace;
+  }
+  
+  /* Light mode overrides */
+  body.light {
+    @apply bg-white text-slate-900;
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Remove default margins */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
   }
 }
 
 @layer components {
+  /* ============================================
+     ORDER CARDS
+     ============================================ */
   .order-card {
-    @apply bg-kds-card border border-kds-border rounded-lg p-4 shadow-lg;
+    @apply bg-kds-bg-secondary border border-kds-border rounded-card p-4 
+           shadow-order-card transition-all duration-200 hover:shadow-order-card-hover
+           hover:border-kds-surface;
+  }
+  
+  .order-card-compact {
+    @apply order-card p-3;
+  }
+  
+  /* ============================================
+     STATUS BADGES
+     ============================================ */
+  .badge {
+    @apply px-3 py-1 rounded-badge font-semibold uppercase tracking-wide 
+           text-xs leading-tight inline-block;
+  }
+  
+  .badge-pending {
+    @apply badge bg-kds-pending text-white;
+  }
+  
+  .badge-confirmed {
+    @apply badge bg-kds-confirmed text-white;
+  }
+  
+  .badge-cooking {
+    @apply badge bg-kds-cooking text-white;
+  }
+  
+  .badge-ready {
+    @apply badge bg-kds-ready text-white;
+  }
+  
+  .badge-delivered {
+    @apply badge bg-kds-delivered text-white;
+  }
+  
+  /* Order type badges */
+  .badge-delivery {
+    @apply badge bg-blue-600 text-white;
+  }
+  
+  .badge-takeaway {
+    @apply badge bg-purple-600 text-white;
+  }
+  
+  .badge-dinein {
+    @apply badge bg-indigo-600 text-white;
+  }
+  
+  /* ============================================
+     BUTTONS
+     ============================================ */
+  .btn {
+    @apply px-6 py-3 rounded-lg font-semibold transition-all duration-200 
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
+           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-kds-bg;
   }
   
   .btn-primary {
-    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+    @apply btn bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500;
   }
+  
+  .btn-success {
+    @apply btn bg-green-600 hover:bg-green-700 text-white focus:ring-green-500;
+  }
+  
+  .btn-warning {
+    @apply btn bg-amber-600 hover:bg-amber-700 text-white focus:ring-amber-500;
+  }
+  
+  .btn-danger {
+    @apply btn bg-red-600 hover:bg-red-700 text-white focus:ring-red-500;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-kds-surface hover:bg-kds-border text-kds-text-primary focus:ring-slate-500;
+  }
+  
+  /* Button sizes */
+  .btn-sm {
+    @apply px-4 py-2 text-sm;
+  }
+  
+  .btn-lg {
+    @apply px-8 py-4 text-lg;
+  }
+  
+  /* Full width button */
+  .btn-block {
+    @apply w-full;
+  }
+  
+  /* ============================================
+     TYPOGRAPHY
+     ============================================ */
+  
+  /* Order ID - Large, bold, monospace */
+  .order-id {
+    @apply text-2xl font-bold text-kds-text-primary tracking-wide;
+  }
+  
+  /* Timer displays */
+  .timer {
+    @apply text-3xl font-bold tracking-tight;
+  }
+  
+  .timer-large {
+    @apply text-4xl font-extrabold;
+  }
+  
+  .timer-small {
+    @apply text-lg font-semibold;
+  }
+  
+  .timer-normal {
+    @apply text-green-400;
+  }
+  
+  .timer-warning {
+    @apply text-yellow-400;
+  }
+  
+  .timer-urgent {
+    @apply text-red-500 animate-pulse;
+  }
+  
+  /* Item names and details */
+  .item-name {
+    @apply text-lg font-medium text-kds-text-primary leading-tight;
+  }
+  
+  .item-detail {
+    @apply text-sm text-kds-text-muted leading-relaxed;
+  }
+  
+  .item-note {
+    @apply text-sm text-kds-text-secondary italic;
+  }
+  
+  /* Quantity badges */
+  .quantity {
+    @apply font-bold text-lg tracking-tight;
+  }
+  
+  .quantity-badge {
+    @apply inline-flex items-center justify-center w-8 h-8 rounded-full 
+           bg-kds-surface text-kds-text-primary font-bold text-sm;
+  }
+  
+  /* Column/Section headers */
+  .column-header {
+    @apply text-xl font-bold text-kds-text-primary uppercase tracking-wide mb-4;
+  }
+  
+  .section-title {
+    @apply text-2xl font-bold text-kds-text-primary mb-3;
+  }
+  
+  /* ============================================
+     LAYOUT & CONTAINERS
+     ============================================ */
+  
+  /* Main container */
+  .container-kds {
+    @apply w-full h-screen overflow-hidden bg-kds-bg;
+  }
+  
+  /* Kanban columns */
+  .kanban-column {
+    @apply flex flex-col h-full p-4 bg-kds-bg-secondary rounded-lg
+           border border-kds-border overflow-y-auto;
+  }
+  
+  /* Scrollable area */
+  .scroll-area {
+    @apply overflow-y-auto scrollbar-thin scrollbar-thumb-kds-border 
+           scrollbar-track-kds-bg-secondary;
+  }
+  
+  /* Card grid */
+  .card-grid {
+    @apply grid gap-4;
+  }
+  
+  /* ============================================
+     UTILITY CLASSES
+     ============================================ */
+  
+  /* Age-based order highlighting */
+  .age-normal {
+    @apply border-l-4 border-green-500;
+  }
+  
+  .age-warning {
+    @apply border-l-4 border-yellow-500;
+  }
+  
+  .age-urgent {
+    @apply border-l-4 border-red-500 animate-pulse-slow;
+  }
+  
+  /* Status indicators */
+  .status-dot {
+    @apply w-3 h-3 rounded-full inline-block;
+  }
+  
+  .status-dot-pending {
+    @apply status-dot bg-blue-500;
+  }
+  
+  .status-dot-confirmed {
+    @apply status-dot bg-amber-500;
+  }
+  
+  .status-dot-cooking {
+    @apply status-dot bg-orange-500 animate-pulse;
+  }
+  
+  .status-dot-ready {
+    @apply status-dot bg-green-500;
+  }
+  
+  /* Dividers */
+  .divider {
+    @apply border-t border-kds-border my-3;
+  }
+  
+  .divider-vertical {
+    @apply border-l border-kds-border mx-3;
+  }
+  
+  /* ============================================
+     INTERACTIVE ELEMENTS
+     ============================================ */
+  
+  /* Checkbox for item tracking */
+  .checkbox-item {
+    @apply w-6 h-6 rounded border-2 border-kds-border cursor-pointer
+           transition-all duration-200 hover:border-kds-surface
+           checked:bg-green-600 checked:border-green-600;
+  }
+  
+  /* Toggle switch */
+  .toggle {
+    @apply relative inline-flex h-6 w-11 items-center rounded-full
+           transition-colors focus:outline-none focus:ring-2 
+           focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-kds-bg;
+  }
+  
+  .toggle-enabled {
+    @apply bg-green-600;
+  }
+  
+  .toggle-disabled {
+    @apply bg-kds-border;
+  }
+  
+  /* Dropdown/Select */
+  .select-kds {
+    @apply w-full px-4 py-2 bg-kds-surface border border-kds-border 
+           rounded-lg text-kds-text-primary focus:outline-none 
+           focus:ring-2 focus:ring-blue-500 focus:border-transparent
+           cursor-pointer;
+  }
+  
+  /* Input field */
+  .input-kds {
+    @apply w-full px-4 py-2 bg-kds-surface border border-kds-border 
+           rounded-lg text-kds-text-primary placeholder-kds-text-muted
+           focus:outline-none focus:ring-2 focus:ring-blue-500 
+           focus:border-transparent;
+  }
+  
+  /* ============================================
+     ANIMATIONS
+     ============================================ */
+  
+  /* Pulsing for urgent items */
+  .pulse-urgent {
+    animation: pulse-urgent 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse-urgent {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+  
+  /* Slide in animation */
+  .slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  @keyframes slideIn {
+    from {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  /* Fade in animation */
+  .fade-in {
+    animation: fadeIn 0.3s ease-in;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  /* Bounce for notifications */
+  .bounce-subtle {
+    animation: bounceSubtle 2s infinite;
+  }
+  
+  @keyframes bounceSubtle {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+  
+  /* ============================================
+     NOTIFICATIONS & ALERTS
+     ============================================ */
+  
+  .alert {
+    @apply p-4 rounded-lg border-l-4 mb-4;
+  }
+  
+  .alert-info {
+    @apply alert bg-blue-900/20 border-blue-500 text-blue-200;
+  }
+  
+  .alert-success {
+    @apply alert bg-green-900/20 border-green-500 text-green-200;
+  }
+  
+  .alert-warning {
+    @apply alert bg-yellow-900/20 border-yellow-500 text-yellow-200;
+  }
+  
+  .alert-danger {
+    @apply alert bg-red-900/20 border-red-500 text-red-200;
+  }
+  
+  /* Toast notification */
+  .toast {
+    @apply fixed bottom-4 right-4 p-4 rounded-lg shadow-2xl 
+           bg-kds-surface border border-kds-border
+           animate-slide-up z-50;
+  }
+  
+  @keyframes slide-up {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  /* ============================================
+     LOADING STATES
+     ============================================ */
+  
+  .spinner {
+    @apply inline-block w-6 h-6 border-4 border-kds-border border-t-blue-500 
+           rounded-full animate-spin;
+  }
+  
+  .spinner-lg {
+    @apply w-12 h-12 border-8;
+  }
+  
+  .skeleton {
+    @apply bg-kds-surface animate-pulse rounded;
+  }
+  
+  /* ============================================
+     PRINT STYLES
+     ============================================ */
+  
+  @media print {
+    body {
+      @apply bg-white text-black;
+    }
+    
+    .no-print {
+      display: none !important;
+    }
+    
+    .order-card {
+      @apply border-2 border-black bg-white break-inside-avoid;
+      page-break-inside: avoid;
+    }
+  }
+}
+
+@layer utilities {
+  /* Custom scrollbar */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-kds-bg-secondary rounded;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-kds-border rounded hover:bg-kds-surface;
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  /* Text truncation */
+  .truncate-2-lines {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .truncate-3-lines {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* ============================================
+   LIGHT MODE OVERRIDES
+   ============================================ */
+body.light {
+  /* Base colors */
+  --kds-bg: #ffffff;
+  --kds-bg-secondary: #f8fafc;
+  --kds-surface: #f1f5f9;
+  --kds-border: #e2e8f0;
+  
+  /* Text colors */
+  --kds-text-primary: #0f172a;
+  --kds-text-secondary: #334155;
+  --kds-text-muted: #64748b;
+}
+
+body.light .order-card {
+  @apply bg-white border-slate-200 shadow-md;
+}
+
+body.light .btn-secondary {
+  @apply bg-slate-200 hover:bg-slate-300 text-slate-900;
+}
+
+body.light .kanban-column {
+  @apply bg-slate-50 border-slate-200;
+}
+
+body.light .input-kds,
+body.light .select-kds {
+  @apply bg-white border-slate-300 text-slate-900;
+}
+
+/* Electron frameless window - Drag region support */
+.electron-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.electron-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* Prevent text selection in draggable areas */
+.electron-drag * {
+  user-select: none;
+  -webkit-user-select: none;
 }

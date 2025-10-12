@@ -1,9 +1,8 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
 
 let mainWindow: BrowserWindow | null = null;
-
 const isDev = process.env.NODE_ENV === 'development';
 
 // Configure auto-updater (only in production)
@@ -36,6 +35,10 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
+    minWidth: 1280,
+    minHeight: 720,
+    frame: false, // Remove default window frame
+    titleBarStyle: 'hidden', // Hide title bar
     fullscreen: !isDev, // Fullscreen in production, windowed in dev
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -43,7 +46,7 @@ function createWindow() {
       contextIsolation: true,
     },
     autoHideMenuBar: true,
-    backgroundColor: '#1a1d29',
+    backgroundColor: '#0f172a', // Updated to match your kds-bg color
     title: 'Kitchen Display System',
   });
 
@@ -67,6 +70,53 @@ function createWindow() {
   }
 }
 
+// Window control IPC handlers
+ipcMain.on('window-minimize', () => {
+  if (mainWindow) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.on('window-maximize', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on('window-close', () => {
+  if (mainWindow) {
+    mainWindow.close();
+  }
+});
+
+ipcMain.on('window-fullscreen', () => {
+  if (mainWindow) {
+    mainWindow.setFullScreen(!mainWindow.isFullScreen());
+  }
+});
+
+// Check if window is maximized
+ipcMain.handle('window-is-maximized', () => {
+  return mainWindow?.isMaximized() || false;
+});
+
+// Listen for maximize/unmaximize events to update UI
+function setupMaximizeListeners() {
+  if (mainWindow) {
+    mainWindow.on('maximize', () => {
+      mainWindow?.webContents.send('window-maximized', true);
+    });
+
+    mainWindow.on('unmaximize', () => {
+      mainWindow?.webContents.send('window-maximized', false);
+    });
+  }
+}
+
 function setupAutoUpdater(window: BrowserWindow) {
   autoUpdater.on('checking-for-update', () => {
     console.log('🔍 Checking for updates...');
@@ -75,7 +125,6 @@ function setupAutoUpdater(window: BrowserWindow) {
   autoUpdater.on('update-available', (info) => {
     console.log('✅ Update available:', info.version);
     window.webContents.send('update_available', info);
-    
     // Automatically start download
     autoUpdater.downloadUpdate();
   });
@@ -97,7 +146,6 @@ function setupAutoUpdater(window: BrowserWindow) {
   autoUpdater.on('update-downloaded', (info) => {
     console.log('✅ Update downloaded:', info.version);
     window.webContents.send('update_downloaded', info);
-    
     // Optional: Auto-install after 30 seconds
     // setTimeout(() => {
     //   autoUpdater.quitAndInstall();
@@ -107,10 +155,12 @@ function setupAutoUpdater(window: BrowserWindow) {
 
 app.whenReady().then(() => {
   createWindow();
+  setupMaximizeListeners();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+      setupMaximizeListeners();
     }
   });
 });

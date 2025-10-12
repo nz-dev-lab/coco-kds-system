@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electron', {
+  // Window controls
+  minimizeWindow: () => ipcRenderer.send('window-minimize'),
+  maximizeWindow: () => ipcRenderer.send('window-maximize'),
+  closeWindow: () => ipcRenderer.send('window-close'),
+  toggleFullscreen: () => ipcRenderer.send('window-fullscreen'),
+  isMaximized: () => ipcRenderer.invoke('window-is-maximized'),
   // Send message to main process
   send: (channel: string, data: any) => {
     ipcRenderer.send(channel, data);
