@@ -1,6 +1,7 @@
 // components/Sidebar.tsx
 import React from 'react';
-import { Home, ClipboardList, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { Home, ClipboardList, Settings, ChevronLeft, ChevronRight, History } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { toggleSidebar } from '../store/slices/uiSlice';
 
@@ -8,8 +9,7 @@ interface NavItem {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  href: string;
-  active?: boolean;
+  path: string;
 }
 
 const navigationItems: NavItem[] = [
@@ -17,20 +17,25 @@ const navigationItems: NavItem[] = [
     id: 'dashboard',
     label: 'Dashboard',
     icon: Home,
-    href: '#',
-    active: true,
+    path: '/dashboard',
   },
   {
     id: 'orders',
     label: 'Orders',
     icon: ClipboardList,
-    href: '#',
+    path: '/orders',
+  },
+  {
+    id: 'history',
+    label: 'History',
+    icon: History,
+    path: '/history',
   },
   {
     id: 'settings',
     label: 'Settings',
     icon: Settings,
-    href: '#',
+    path: '/settings',
   },
 ];
 
@@ -61,18 +66,24 @@ export default function Sidebar() {
             {navigationItems.map((item) => {
               const Icon = item.icon;
               return (
-                <a
+                <NavLink
                   key={item.id}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                    item.active
-                      ? 'bg-blue-50 dark:bg-kds-surface text-blue-700 dark:text-kds-text-primary font-medium border border-blue-200 dark:border-kds-border'
-                      : 'text-slate-600 dark:text-kds-text-secondary hover:bg-slate-100 dark:hover:bg-kds-surface hover:text-slate-900 dark:hover:text-kds-text-primary'
-                  }`}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-50 dark:bg-kds-surface text-blue-700 dark:text-kds-text-primary font-medium border border-blue-200 dark:border-kds-border'
+                        : 'text-slate-600 dark:text-kds-text-secondary hover:bg-slate-100 dark:hover:bg-kds-surface hover:text-slate-900 dark:hover:text-kds-text-primary'
+                    }`
+                  }
                 >
-                  <Icon className={`w-5 h-5 ${item.active ? 'text-blue-600 dark:text-blue-400' : ''}`} />
-                  <span>{item.label}</span>
-                </a>
+                  {({ isActive }) => (
+                    <>
+                      <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600 dark:text-blue-400' : ''}`} />
+                      <span>{item.label}</span>
+                    </>
+                  )}
+                </NavLink>
               );
             })}
           </nav>

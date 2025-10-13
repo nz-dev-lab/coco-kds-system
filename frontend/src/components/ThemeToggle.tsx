@@ -1,3 +1,4 @@
+// src/components/ThemeToggle.tsx
 import { Sun, Moon } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { toggleTheme, setTheme } from '../store/slices/uiSlice';
@@ -20,7 +21,6 @@ export default function ThemeToggle() {
   useEffect(() => {
     localStorage.setItem('kds-theme', theme);
     document.documentElement.classList.toggle('dark', theme === 'dark');
-    
     // Optional: Also update body class for your CSS
     document.body.classList.toggle('light', theme === 'light');
   }, [theme]);
@@ -32,7 +32,9 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={handleToggle}
-      className={`p-2 rounded-lg ${theme === 'dark' ? 'hover:bg-kds-surface': 'hover:bg-slate-100'} transition-colors`}
+      className={`p-2 rounded-lg ${
+        theme === 'dark' ? 'hover:bg-kds-surface' : 'hover:bg-slate-100'
+      } transition-colors`}
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
       title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
     >

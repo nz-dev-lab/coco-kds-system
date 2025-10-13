@@ -3,12 +3,16 @@ import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchOrders } from '../store/slices/ordersSlice';
 import OrderCard from '../components/orders/OrderCard';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Clock } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useLiveClock } from '../hooks/useLiveClock'; // NEW: Live clock hook
 
 export default function Dashboard() {
   const dispatch = useAppDispatch();
   const { orders, loading, error } = useAppSelector((state) => state.orders);
+  
+  // Live clock that updates every second
+  const currentTime = useLiveClock();
 
   useWebSocket();
 
@@ -55,6 +59,16 @@ export default function Dashboard() {
     dispatch(fetchOrders());
   };
 
+  // Format time function
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  };
+
   if (loading && orders.length === 0) {
     return (
       <div className="flex items-center justify-center h-full bg-slate-50 dark:bg-kds-bg">
@@ -71,6 +85,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="bg-white dark:bg-kds-bg-secondary border-b border-slate-200 dark:border-kds-border px-6 py-4">
         <div className="flex items-center justify-between">
+          {/* Left: Title */}
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-kds-text-primary">
               Active Orders
@@ -79,7 +94,16 @@ export default function Dashboard() {
               {sortedOrders.length} {sortedOrders.length === 1 ? 'order' : 'orders'} in queue
             </p>
           </div>
-          
+
+          {/* Center: Live Clock */}
+          <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-kds-surface rounded-lg border border-slate-200 dark:border-kds-border">
+            <Clock className="w-5 h-5 text-slate-600 dark:text-kds-text-secondary" />
+            <span className="text-2xl font-mono font-bold text-slate-900 dark:text-kds-text-primary tracking-wider">
+              {formatTime(currentTime)}
+            </span>
+          </div>
+
+          {/* Right: Refresh Button */}
           <button
             onClick={handleRefresh}
             disabled={loading}
@@ -134,8 +158,7 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-        //   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-fr">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-max">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-max">
             {sortedOrders.map((order) => (
               <OrderCard key={order.id} order={order} />
             ))}
