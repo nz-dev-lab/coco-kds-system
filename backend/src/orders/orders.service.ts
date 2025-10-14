@@ -225,19 +225,13 @@ if (updatedOrder) {
   }
 
 private calculateOrderAge(createdAt: Date): number {
-  console.log('=== ORDER AGE DEBUG ===');
-  console.log('Input createdAt:', createdAt);
-  console.log('Input createdAt ISO:', new Date(createdAt).toISOString());
-  console.log('Input createdAt getTime:', new Date(createdAt).getTime());
-  
   const now = DateTime.now();
-  console.log('Current time (Luxon):', now.toISO());
-  console.log('Current time (JS):', new Date().toISOString());
   
-  // Your current Luxon logic
+  // Parse what's in the database (stored as Europe/London time)
+  // by treating the UTC timestamp as if it were London local time
   const storedValue = DateTime.fromJSDate(new Date(createdAt));
-  console.log('Step 1 - storedValue:', storedValue.toISO());
   
+  // Figure out what timezone offset London had at that moment
   const londonAtThatTime = DateTime.fromObject({
     year: storedValue.year,
     month: storedValue.month,
@@ -246,17 +240,14 @@ private calculateOrderAge(createdAt: Date): number {
     minute: storedValue.minute,
     second: storedValue.second
   }, { zone: 'Europe/London' });
-  console.log('Step 2 - londonAtThatTime:', londonAtThatTime.toISO());
-  console.log('Step 2 - offset:', londonAtThatTime.offset);
   
+  // Convert to actual UTC
   const actualUTC = londonAtThatTime.toUTC();
-  console.log('Step 3 - actualUTC:', actualUTC.toISO());
   
   const diff = now.diff(actualUTC, 'minutes');
-  console.log('Step 4 - age:', Math.floor(diff.minutes), 'minutes');
-  console.log('======================');
   
-  return Math.floor(diff.minutes);
+  // ✨ FIX: Never return negative age (handles timing edge cases)
+  return Math.max(0, Math.floor(diff.minutes));
 }
 
  async getAvailableDeliveryMen(restaurantId: number, zoneId: number) {
