@@ -150,7 +150,7 @@ if (updatedOrder) {
     }
   }
 
-  private formatOrder(order: Order) {
+private formatOrder(order: Order) {
   // Parse delivery_address to extract customer info
   let customerName: string | null = null;
   let parsedDeliveryAddress: DeliveryAddress | null = null;
@@ -161,7 +161,6 @@ if (updatedOrder) {
         ? JSON.parse(order.delivery_address)
         : order.delivery_address;
       
-      // Type assertion after parsing
       parsedDeliveryAddress = parsed as DeliveryAddress;
       customerName = parsedDeliveryAddress?.contact_person_name || null;
     } catch (e) {
@@ -180,22 +179,52 @@ if (updatedOrder) {
     order_note: order.order_note,
     delivery_instruction: order.delivery_instruction,
     delivery_man_id: order.delivery_man_id,
-    created_at: order.created_at,
-    schedule_at: order.schedule_at,
+    
+    // ✨ FIX: Format timestamps as ISO UTC for consistency
+    created_at: this.formatDateToISO(order.created_at),
+    schedule_at: order.schedule_at ? this.formatDateToISO(order.schedule_at) : null,
+    
     order_age_minutes: this.calculateOrderAge(order.created_at),
     is_scheduled: order.schedule_at ? new Date(order.schedule_at) > new Date() : false,
     customer_name: customerName,
     delivery_address: parsedDeliveryAddress,
+    
+    // ✨ FIX: Format all status timestamps as ISO UTC
     status_timestamps: {
-      pending: order.pending,
-      confirmed: order.confirmed,
-      processing: order.processing,
-      handover: order.handover,
-      delivered: order.delivered,
+      pending: order.pending ? this.formatDateToISO(order.pending) : null,
+      confirmed: order.confirmed ? this.formatDateToISO(order.confirmed) : null,
+      processing: order.processing ? this.formatDateToISO(order.processing) : null,
+      handover: order.handover ? this.formatDateToISO(order.handover) : null,
+      delivered: order.delivered ? this.formatDateToISO(order.delivered) : null,
     },
+    
     items: order.details.map((detail) => this.formatOrderDetail(detail)),
     item_count: order.details.reduce((sum, d) => sum + d.quantity, 0),
   };
+}
+
+// ✨ NEW METHOD: Convert Laravel timestamp to ISO UTC string
+private formatDateToISO(date: Date | string | null): string | null {
+  if (!date) return null;
+  
+  try {
+    // Parse the date assuming it's London time (as Laravel saves it)
+    const storedValue = DateTime.fromJSDate(new Date(date));
+    const londonTime = DateTime.fromObject({
+      year: storedValue.year,
+      month: storedValue.month,
+      day: storedValue.day,
+      hour: storedValue.hour,
+      minute: storedValue.minute,
+      second: storedValue.second
+    }, { zone: 'Europe/London' });
+    
+    // Convert to UTC and return ISO string with 'Z'
+    return londonTime.toUTC().toISO();
+  } catch (e) {
+    console.error('Error formatting date to ISO:', e);
+    return null;
+  }
 }
 
   private formatOrderDetail(detail: OrderDetail) {
@@ -223,6 +252,8 @@ if (updatedOrder) {
       return null;
     }
   }
+
+
 
 private calculateOrderAge(createdAt: Date): number {
   const now = DateTime.now();
