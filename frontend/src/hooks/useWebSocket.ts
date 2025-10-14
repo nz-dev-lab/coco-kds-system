@@ -80,10 +80,8 @@ const transformOrder = (rawOrder: any) => {
       }
     }
 
-    // Calculate order age in minutes
-    const createdAt = new Date(rawOrder.created_at);
-    const now = new Date();
-    const ageMinutes = Math.floor((now.getTime() - createdAt.getTime()) / 60000);
+    // ✨ FIX: Use backend's calculated age (backend handles timezone correctly)
+    const ageMinutes = rawOrder.order_age_minutes || 0;
 
     // Return transformed order
     return {
@@ -96,9 +94,9 @@ const transformOrder = (rawOrder: any) => {
       processing_time: rawOrder.processing_time,
       order_note: rawOrder.order_note,
       delivery_instruction: rawOrder.delivery_instruction,
-      created_at: rawOrder.created_at,
+      created_at: rawOrder.created_at, // Backend now sends ISO UTC format
       schedule_at: rawOrder.schedule_at,
-      order_age_minutes: ageMinutes,
+      order_age_minutes: ageMinutes, // ✨ Use backend's value
       is_scheduled: rawOrder.scheduled === 1,
       items: items,
       item_count: items.length,

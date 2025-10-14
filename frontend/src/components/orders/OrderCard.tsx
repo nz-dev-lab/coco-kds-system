@@ -56,14 +56,25 @@ export default function OrderCard({ order }: OrderCardProps) {
     );
   }
 
-  // Calculate order age in real-time using currentTime
-  const calculateOrderAge = (createdAt: string): number => {
-    const created = new Date(createdAt);
-    const diffMs = currentTime.getTime() - created.getTime();
-    return Math.floor(diffMs / 60000); // Convert to minutes
-  };
+const calculateOrderAge = (createdAt: string, backendAge: number): number => {
+  // Parse ISO UTC format
+  const created = new Date(createdAt);
+  
+  // If parsing failed or resulted in invalid date, use backend age
+  if (isNaN(created.getTime())) {
+    console.warn('Invalid date format:', createdAt);
+    return backendAge;
+  }
+  
+  // Calculate age from UTC timestamps
+  const diffMs = currentTime.getTime() - created.getTime();
+  return Math.max(0, Math.floor(diffMs / 60000));
+};
 
-  const orderAge = order.created_at ? calculateOrderAge(order.created_at) : order.order_age_minutes;
+// Use it with fallback
+const orderAge = order.created_at 
+  ? calculateOrderAge(order.created_at, order.order_age_minutes)
+  : order.order_age_minutes;
 
   // Calculate scheduled info
   const scheduledInfo = order.schedule_at && order.created_at

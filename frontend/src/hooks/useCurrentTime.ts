@@ -37,19 +37,18 @@ function stopGlobalTimer() {
  * @returns Current Date object that updates every minute
  */
 export function useCurrentTime(): Date {
-  const [currentTime, setCurrentTime] = useState(globalTime);
+  // ✨ FIX: Always start with fresh time
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   useEffect(() => {
-    // Subscribe to global timer
+    // ✨ FIX: Update immediately on mount to sync
+    setCurrentTime(new Date());
+    
     listeners.add(setCurrentTime);
     startGlobalTimer();
-
-    console.log('🔔 Component subscribed to time updates. Total listeners:', listeners.size);
-
-    // Unsubscribe on unmount
+    
     return () => {
       listeners.delete(setCurrentTime);
-      console.log('🔕 Component unsubscribed. Remaining listeners:', listeners.size);
       stopGlobalTimer();
     };
   }, []);
