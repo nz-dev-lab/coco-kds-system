@@ -13,6 +13,7 @@ export function useWebSocket() {
   // Transform Laravel order format to frontend format
 const transformOrder = (rawOrder: any) => {
   try {
+    console.log('Transforming order:', rawOrder);
     // Map 'details' to 'items' and transform structure
     const items = (rawOrder.details || []).map((detail: any) => {
       // Parse food_details JSON string if it exists
@@ -124,33 +125,116 @@ const transformOrder = (rawOrder: any) => {
       console.log('✅ WebSocket connected:', data);
     });
 
+    // socket.on('order:new', (rawOrder) => {
+    //   console.log('📥 New order received (raw):', rawOrder);
+
+    //   // Transform the order
+    //   const transformedOrder = transformOrder(rawOrder);
+
+    //   if (transformedOrder && transformedOrder.items && transformedOrder.items.length > 0) {
+    //     console.log('✅ Order transformed successfully:', transformedOrder);
+    //     dispatch(addOrder(transformedOrder));
+    //   } else {
+    //     console.error('❌ Order transformation failed or no items:', rawOrder);
+    //   }
+    // });
+
+    // socket.on('order:updated', (rawOrder) => {
+    //   console.log('🔄 Order updated (raw):', rawOrder);
+
+    //   // Transform the order
+    //   const transformedOrder = transformOrder(rawOrder);
+
+    //   if (transformedOrder && transformedOrder.items && transformedOrder.items.length > 0) {
+    //     console.log('✅ Order updated successfully:', transformedOrder);
+    //     dispatch(updateOrder(transformedOrder));
+    //   } else {
+    //     console.error('❌ Order update transformation failed or no items:', rawOrder);
+    //   }
+    // });
+
     socket.on('order:new', (rawOrder) => {
-      console.log('📥 New order received (raw):', rawOrder);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('📥 NEW ORDER EVENT');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('Raw data received:', rawOrder);
+  console.log('Top-level keys:', Object.keys(rawOrder));
+  console.log('Has "order" key?', !!rawOrder.order);
+  console.log('Has "details" key?', !!rawOrder.details);
+  console.log('Has "items" key?', !!rawOrder.items);
+  
+  if (rawOrder.order) {
+    console.log('🔍 Nested order keys:', Object.keys(rawOrder.order));
+    console.log('🔍 Nested order.details?', !!rawOrder.order.details);
+    console.log('🔍 Nested order.details length:', rawOrder.order.details?.length);
+  }
+  
+  if (rawOrder.details) {
+    console.log('🔍 Direct details length:', rawOrder.details?.length);
+    console.log('🔍 First detail:', rawOrder.details?.[0]);
+  }
+  
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-      // Transform the order
-      const transformedOrder = transformOrder(rawOrder);
+  const transformedOrder = transformOrder(rawOrder);
 
-      if (transformedOrder && transformedOrder.items && transformedOrder.items.length > 0) {
-        console.log('✅ Order transformed successfully:', transformedOrder);
-        dispatch(addOrder(transformedOrder));
-      } else {
-        console.error('❌ Order transformation failed or no items:', rawOrder);
-      }
-    });
+  if (transformedOrder && transformedOrder.items && transformedOrder.items.length > 0) {
+    console.log('✅ Order transformed successfully:', transformedOrder);
+    dispatch(addOrder(transformedOrder));
+  } else {
+    console.error('❌ Order transformation failed or no items:', rawOrder);
+  }
+});
 
-    socket.on('order:updated', (rawOrder) => {
-      console.log('🔄 Order updated (raw):', rawOrder);
-
-      // Transform the order
-      const transformedOrder = transformOrder(rawOrder);
-
-      if (transformedOrder && transformedOrder.items && transformedOrder.items.length > 0) {
-        console.log('✅ Order updated successfully:', transformedOrder);
-        dispatch(updateOrder(transformedOrder));
-      } else {
-        console.error('❌ Order update transformation failed or no items:', rawOrder);
-      }
-    });
+socket.on('order:updated', (rawOrder) => {
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🔄 ORDER UPDATED EVENT');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('Raw data received:', rawOrder);
+  console.log('Top-level keys:', Object.keys(rawOrder));
+  console.log('Has "order" key?', !!rawOrder.order);
+  console.log('Has "details" key?', !!rawOrder.details);
+  console.log('Has "items" key?', !!rawOrder.items);
+  
+  // ✨ FIX: Check if already formatted (has items) or needs transform (has details)
+  let orderToDispatch;
+  
+  if (rawOrder.items) {
+    // Already formatted by NestJS - use as-is
+    console.log('✅ Order already formatted with items:', rawOrder.items.length);
+    orderToDispatch = rawOrder;
+  } else if (rawOrder.details) {
+    // Has Laravel details - transform it
+    console.log('🔄 Order has details, transforming...');
+    const transformedOrder = transformOrder(rawOrder);
+    
+    if (transformedOrder && transformedOrder.items && transformedOrder.items.length > 0) {
+      console.log('✅ Order transformed successfully:', transformedOrder.items.length);
+      orderToDispatch = transformedOrder;
+    } else {
+      console.error('❌ Order transformation failed');
+      return; // Don't update if transform failed
+    }
+  } else {
+    console.error('❌ Order has neither items nor details!');
+    return;
+  }
+  
+  // Dispatch the update
+  if (orderToDispatch) {
+    // ✨ Additional safety: If items array is empty, don't update
+    if (!orderToDispatch.items || orderToDispatch.items.length === 0) {
+      console.warn('⚠️ Order has empty items, skipping WebSocket update');
+      console.warn('⚠️ Redux fix will preserve existing items');
+      return;
+    }
+    
+    console.log('✅ Dispatching order update with', orderToDispatch.items.length, 'items');
+    dispatch(updateOrder(orderToDispatch));
+  }
+  
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+});
 
     socket.on('disconnect', () => {
       console.log('❌ WebSocket disconnected');

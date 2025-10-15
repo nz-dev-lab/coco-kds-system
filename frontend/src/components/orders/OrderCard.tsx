@@ -1,12 +1,15 @@
 // src/components/orders/OrderCard.tsx
 import { User, Printer, AlertCircle, Bike, CalendarClock } from 'lucide-react';
 import { useAppDispatch } from '../../store/hooks';
-import { toggleItemReady } from '../../store/slices/ordersSlice';
+import { toggleItemReady, updateOrderStatus } from '../../store/slices/ordersSlice';
 import DeliveryDetailsModal from './DeliveryDetailsModal';
 import { useEffect, useRef, useState } from 'react';
 import { getScheduledInfo, formatCountdown } from '../../utils/scheduledOrderUtils';
 import { audioNotificationService } from '@/utils/audioNotifications';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
+import DeliveryAssignmentModal from './DeliveryAssignmentModal';
+import { assignDeliveryMan } from '@/store/slices/ordersSlice';
+import { toast } from 'react-hot-toast'; // or your toast library
 
 interface Order {
   id: string;
@@ -40,21 +43,13 @@ interface OrderCardProps {
 export default function OrderCard({ order }: OrderCardProps) {
   const dispatch = useAppDispatch();
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const currentTime = useCurrentTime();
 
   // Add safety check for items
   const items = order.items || [];
 
-  // If no items, show error state
-  if (!order || !items.length) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-red-600 text-sm">
-          ⚠️ Order #{order?.id || 'unknown'} has no items
-        </p>
-      </div>
-    );
-  }
+  
 
 const calculateOrderAge = (createdAt: string, backendAge: number): number => {
   // Parse ISO UTC format
@@ -152,27 +147,90 @@ const orderAge = order.created_at
     console.log('Bump order:', order.id);
   };
 
-  const handleAssignDelivery = () => {
-    if (order.order_status === 'handover' && order.order_type === 'delivery' && !order.delivery_man_id) {
-      console.log('Assign delivery:', order.id);
-    }
-  };
+ const handleAssignDelivery = () => {
+  setShowAssignModal(true);
+};
 
-  const handleConfirm = () => {
-    console.log('Confirm order:', order.id);
-  };
+const handleAssignDeliveryMan = async (deliveryManId: number) => {
+  try {
+    await dispatch(assignDeliveryMan({
+      orderId: order.id,
+      deliveryManId: deliveryManId,
+    })).unwrap();
+    
+    toast.success('Delivery man assigned successfully!');
+  } catch (error: any) {
+    toast.error(error.message || 'Failed to assign delivery man');
+    throw error; // Re-throw so modal can handle it
+  }
+};
 
-  const handleStartCooking = () => {
-    console.log('Start cooking:', order.id);
-  };
+
+  const handleConfirm = async () => {
+  try {
+    await dispatch(updateOrderStatus({
+      orderId: order.id,
+      status: 'confirmed',
+    })).unwrap();
+    
+    console.log('✅ Order confirmed:', order.id);
+  } catch (error) {
+    console.error('❌ Failed to confirm order:', error);
+    // TODO: Show error toast/notification
+  }
+};
+
+  const handleStartCooking = async () => {
+  try {
+    // For scheduled orders, could add processing_time prompt
+    await dispatch(updateOrderStatus({
+      orderId: order.id,
+      status: 'processing',
+      // processingTime: '15', // Optional: add modal to ask for time
+    })).unwrap();
+    
+    console.log('✅ Order moved to processing:', order.id);
+  } catch (error) {
+    console.error('❌ Failed to start cooking:', error);
+  }
+};
+
+const handleMarkReady = async () => {
+  try {
+    await dispatch(updateOrderStatus({
+      orderId: order.id,
+      status: 'handover',
+    })).unwrap();
+    
+    console.log('✅ Order marked as ready:', order.id);
+  } catch (error) {
+    console.error('❌ Failed to mark order ready:', error);
+  }
+};
+
+const handleComplete = async () => {
+  try {
+    // Note: Backend might prevent this for delivery orders
+    await dispatch(updateOrderStatus({
+      orderId: order.id,
+      status: 'delivered',
+    })).unwrap();
+    
+    console.log('✅ Order completed:', order.id);
+  } catch (error) {
+    console.error('❌ Failed to complete order:', error);
+  }
+};
 
   // Check if delivery assignment is available
   const canAssignDelivery = order.order_type === 'delivery' &&
-    order.order_status === 'handover' &&
-    !order.delivery_man_id;
+    order.order_status === 'handover'; //&&
+    //!order.delivery_man_id;
 
   // Track previous scheduled status
   const prevStatusRef = useRef<'locked' | 'ready' | 'overdue' | undefined>(undefined);
+
+  
 
   // Audio notification effect
   useEffect(() => {
@@ -208,6 +266,21 @@ const orderAge = order.created_at
       audioNotificationService.resetOrderNotification(order.id);
     }
   }, [order.order_status, order.id]);
+
+  // If no items, show error state
+  if (!order || !items.length) {
+    // console.error('Order has no items or is invalid:', order);
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-red-600 text-sm">
+          ⚠️ Order #{order?.id || 'unknown'} has no items
+        </p>
+      </div>
+    );
+  }
+  // if(order){
+  //   console.log('Rendering OrderCard for order:', order.id, order);
+  // }
 
   return (
     <div className={`bg-white rounded-lg border-l-4 ${getAgeBorderColor()} shadow-md hover:shadow-lg transition-shadow flex flex-col min-h-[500px]`}>
@@ -418,7 +491,7 @@ const orderAge = order.created_at
         {/* Mark as Ready */}
         {order.order_status === 'processing' && (
           <button
-            onClick={handleBump}
+            onClick={handleMarkReady}
             className="w-full py-2.5 mb-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-colors"
           >
             Mark as Ready
@@ -485,6 +558,15 @@ const orderAge = order.created_at
           orderType={order.order_type}
         />
       )}
+
+      {/* Delivery Assignment Modal - ADD THIS */}
+      <DeliveryAssignmentModal
+        isOpen={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        onAssign={handleAssignDeliveryMan}
+        orderId={order.id}
+        currentDeliveryManId={order.delivery_man_id}
+      />
     </div>
   );
 }
