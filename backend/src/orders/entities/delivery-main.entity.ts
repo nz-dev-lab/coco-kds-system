@@ -20,6 +20,9 @@ export class DeliveryMan {
   @Column({ type: 'bigint', nullable: true })
   restaurant_id: number;
 
+  @Column({ type: 'bigint', nullable: true })
+  zone_id: number;
+
   @Column({ type: 'tinyint', default: 1 })
   status: number; // 1 = active, 0 = inactive
 
@@ -35,6 +38,9 @@ export class DeliveryMan {
 
   @Column({ type: 'int', default: 0 })
   current_orders: number;
+
+  @Column({ type: 'int', unsigned: true, default: 0 })
+  assigned_order_count: number;
 
   @Column({ type: 'varchar', length: 191, default: 'zone_wise' })
   type: string; // zone_wise or restaurant_wise
