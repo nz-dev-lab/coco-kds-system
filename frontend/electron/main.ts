@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
+import { statements } from './database';
 
 let mainWindow: BrowserWindow | null = null;
 const isDev = process.env.NODE_ENV === 'development';
@@ -165,6 +166,10 @@ app.whenReady().then(() => {
       setupMaximizeListeners();
     }
   });
+
+  const restaurantId = '2';
+  const count = statements.getTotalCount.get(restaurantId);
+  console.log(`📊 Total orders for restaurant ${restaurantId}:`, count);
 });
 
 app.on('window-all-closed', () => {
