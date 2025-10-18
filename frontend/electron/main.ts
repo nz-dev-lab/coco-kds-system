@@ -1,7 +1,15 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
-import { statements } from './database';
+import { 
+  addCompletedOrder, 
+  getDailyStats, 
+  getOrdersByDate, 
+  getRevenueTrend,
+  cleanupOldOrders,
+  closeDatabase,
+  statements 
+} from './database';
 
 let mainWindow: BrowserWindow | null = null;
 const isDev = process.env.NODE_ENV === 'development';
@@ -170,6 +178,87 @@ app.whenReady().then(() => {
   const restaurantId = '2';
   const count = statements.getTotalCount.get(restaurantId);
   console.log(`📊 Total orders for restaurant ${restaurantId}:`, count);
+});
+
+// ==========================================
+// DATABASE IPC HANDLERS
+// ==========================================
+
+// Store completed order
+ipcMain.handle('db:add-completed-order', async (event, order) => {
+  try {
+    console.log('📦 Storing completed order:', order.id);
+    const result = addCompletedOrder(order);
+    return result;
+  } catch (error: any) {
+    console.error('❌ Failed to store order:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get daily statistics
+ipcMain.handle('db:get-daily-stats', async (event, date: string, restaurantId: string) => {
+  try {
+    console.log('📊 Getting daily stats for:', date, restaurantId);
+    const result = getDailyStats(date, restaurantId);
+    return result;
+  } catch (error: any) {
+    console.error('❌ Failed to get daily stats:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get orders by date
+ipcMain.handle('db:get-orders-by-date', async (event, date: string, restaurantId: string) => {
+  try {
+    console.log('📋 Getting orders for date:', date, restaurantId);
+    const result = getOrdersByDate(date, restaurantId);
+    return result;
+  } catch (error: any) {
+    console.error('❌ Failed to get orders:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get revenue trend
+ipcMain.handle('db:get-revenue-trend', async (event, days: number, restaurantId: string) => {
+  try {
+    console.log('📈 Getting revenue trend for:', days, 'days', restaurantId);
+    const result = getRevenueTrend(days, restaurantId);
+    return result;
+  } catch (error: any) {
+    console.error('❌ Failed to get revenue trend:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Cleanup old orders
+ipcMain.handle('db:cleanup-old-orders', async (event, days: number, restaurantId: string) => {
+  try {
+    console.log('🗑️ Cleaning up orders older than:', days, 'days for', restaurantId);
+    const result = cleanupOldOrders(days, restaurantId);
+    return result;
+  } catch (error: any) {
+    console.error('❌ Failed to cleanup:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get total order count for restaurant
+ipcMain.handle('db:get-total-count', async (event, restaurantId: string) => {
+  try {
+    const result = statements.getTotalCount.get(restaurantId);
+    return { success: true, data: result };
+  } catch (error: any) {
+    console.error('❌ Failed to get count:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Close database on quit
+app.on('before-quit', () => {
+  console.log('🔒 Closing database...');
+  closeDatabase();
 });
 
 app.on('window-all-closed', () => {

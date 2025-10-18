@@ -36,6 +36,34 @@ contextBridge.exposeInMainWorld('electron', {
   onUpdateDownloaded: (callback: () => void) => {
     ipcRenderer.on('update_downloaded', callback);
   },
+
+  // DATABASE API
+  // ==========================================
+  database: {
+    // Store completed order
+    addCompletedOrder: (order: any) => 
+      ipcRenderer.invoke('db:add-completed-order', order),
+    
+    // Get daily statistics
+    getDailyStats: (date: string, restaurantId: string) => 
+      ipcRenderer.invoke('db:get-daily-stats', date, restaurantId),
+    
+    // Get orders by date
+    getOrdersByDate: (date: string, restaurantId: string) => 
+      ipcRenderer.invoke('db:get-orders-by-date', date, restaurantId),
+    
+    // Get revenue trend
+    getRevenueTrend: (days: number, restaurantId: string) => 
+      ipcRenderer.invoke('db:get-revenue-trend', days, restaurantId),
+    
+    // Cleanup old orders
+    cleanupOldOrders: (days: number, restaurantId: string) => 
+      ipcRenderer.invoke('db:cleanup-old-orders', days, restaurantId),
+    
+    // Get total count
+    getTotalCount: (restaurantId: string) => 
+      ipcRenderer.invoke('db:get-total-count', restaurantId),
+  },
 });
 
 // Type declarations
