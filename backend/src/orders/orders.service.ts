@@ -35,7 +35,7 @@ export class OrdersService {
     pending: ['confirmed'],
     confirmed: ['processing'],
     processing: ['handover'],
-    handover: [],
+    handover: ['delivered'],
     delivered: [],
     canceled: [],
   };
@@ -114,6 +114,8 @@ export class OrdersService {
         }
       } else if (dto.order_status === 'handover') {
         order.handover = now;
+      }else if (dto.order_status === 'delivered') {  // ✅ ADD THIS
+       order.delivered = now;
       }
 
       if (dto.delivery_man_id) {
@@ -142,6 +144,17 @@ export class OrdersService {
     if (order.delivered !== null) {
       throw new BadRequestException('Cannot change status after delivered');
     }
+
+      // ✅ Special case: handover → delivered only for takeaway/dine-in
+  if (order.order_status === 'handover' && newStatus === 'delivered') {
+    if (order.order_type === 'delivery') {
+      throw new BadRequestException(
+        'Delivery orders are marked as delivered by the delivery man via mobile app, not from KDS'
+      );
+    }
+    // Allow for takeaway/dine-in orders
+    return;
+  }
 
     const allowedTransitions = this.VALID_TRANSITIONS[order.order_status];
     if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
