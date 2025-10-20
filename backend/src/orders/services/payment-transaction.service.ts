@@ -298,18 +298,16 @@ private async updateWallets(
   });
 
   if (!adminWallet) {
-    adminWallet = manager.create(AdminWallet, {
-      admin_id: 1,
-      total_commission_earning: 0,
-      digital_received: 0,
-      manual_received: 0,
-      delivery_charge: 0,
-      total_withdrawn: 0,
-      pending_withdraw: 0,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
-  }
+  adminWallet = manager.create(AdminWallet, {
+    admin_id: 1,
+    total_commission_earning: 0,
+    digital_received: 0,
+    manual_received: 0,
+    delivery_charge: 0,
+    created_at: new Date(),
+    updated_at: new Date(),
+  });
+}
 
   // 2. Get or create Restaurant Wallet
   let restaurantWallet = await manager.findOne(RestaurantWallet, {
