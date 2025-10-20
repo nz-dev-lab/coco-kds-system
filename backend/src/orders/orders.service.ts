@@ -13,6 +13,7 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { Restaurant } from '../auth/restaurant.entity';
 import { OrdersGateway } from './orders/orders.gateway';
 import { DateTime } from 'luxon';
+import { PaymentTransactionService } from './services/payment-transaction.service';
 
 export interface DeliveryAddress {
   contact_person_name: string;
@@ -48,6 +49,7 @@ export class OrdersService {
     @InjectRepository(DeliveryMan)
     private deliveryManRepo: Repository<DeliveryMan>,
     private ordersGateway: OrdersGateway,
+    private paymentTransactionService: PaymentTransactionService, 
   ) {}
 
   async getKitchenOrders(restaurantId: number) {
@@ -116,6 +118,7 @@ export class OrdersService {
         order.handover = now;
       }else if (dto.order_status === 'delivered') {  // ✅ ADD THIS
        order.delivered = now;
+       await this.paymentTransactionService.createTransactionForDeliveredOrder(manager, order);
       }
 
       if (dto.delivery_man_id) {
