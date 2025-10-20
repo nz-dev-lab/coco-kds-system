@@ -9,10 +9,13 @@ import { Order } from './entities/order.entity';
 import { OrderDetail } from './entities/order-detail.entities';
 import { DeliveryMan } from './entities/delivery-main.entity';
 import { RedisModule } from 'src/redis/redis.module';
+import { OrderTransaction } from './entities/order-transaction.entity';
+import { OrderPayment } from './entities/order-payment.entity';
+import { PaymentTransactionService } from './services/payment-transaction.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderDetail, DeliveryMan]),
+    TypeOrmModule.forFeature([Order, OrderDetail, DeliveryMan, OrderTransaction, OrderPayment]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -23,7 +26,7 @@ import { RedisModule } from 'src/redis/redis.module';
     forwardRef(() => RedisModule), // Use forwardRef here too
   ],
   controllers: [OrdersController],
-  providers: [OrdersService, OrdersGateway],
+  providers: [OrdersService, OrdersGateway, PaymentTransactionService,],
   exports: [OrdersService, OrdersGateway],
 })
 export class OrdersModule {}
