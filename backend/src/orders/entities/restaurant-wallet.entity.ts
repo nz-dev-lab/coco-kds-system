@@ -2,10 +2,10 @@ import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('restaurant_wallets')
 export class RestaurantWallet {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
   id: number;
 
-  @Column()
+  @Column({ type: 'bigint', unsigned: true })
   vendor_id: number;
 
   @Column({ type: 'decimal', precision: 24, scale: 2, default: 0 })
@@ -20,9 +20,9 @@ export class RestaurantWallet {
   @Column({ type: 'decimal', precision: 24, scale: 2, default: 0 })
   collected_cash: number;
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamp', nullable: true })
   created_at: Date;
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamp', nullable: true })
   updated_at: Date;
 }
