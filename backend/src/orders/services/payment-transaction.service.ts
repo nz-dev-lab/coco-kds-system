@@ -298,16 +298,16 @@ private async updateWallets(
   });
 
   if (!adminWallet) {
-  adminWallet = manager.create(AdminWallet, {
-    admin_id: 1,
-    total_commission_earning: 0,
-    digital_received: 0,
-    manual_received: 0,
-    delivery_charge: 0,
-    created_at: new Date(),
-    updated_at: new Date(),
-  });
-}
+    adminWallet = manager.create(AdminWallet, {
+      admin_id: 1,
+      total_commission_earning: 0,
+      digital_received: 0,
+      manual_received: 0,
+      delivery_charge: 0,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+  }
 
   // 2. Get or create Restaurant Wallet
   let restaurantWallet = await manager.findOne(RestaurantWallet, {
@@ -326,39 +326,50 @@ private async updateWallets(
     });
   }
 
-  // 3. Update Admin Wallet
-  adminWallet.total_commission_earning += transactionData.adminCommission + transactionData.deliveryFeeCommission;
+  // 3. Update Admin Wallet (FORCE NUMBER TYPE)
+  adminWallet.total_commission_earning = 
+    Number(adminWallet.total_commission_earning) 
+    + Number(transactionData.adminCommission) 
+    + Number(transactionData.deliveryFeeCommission);
   
   if (transactionData.receivedBy === 'admin') {
-    // Digital payment - admin receives
-    adminWallet.digital_received += parseFloat(order.order_amount) - parseFloat(order.partially_paid_amount || '0');
+    adminWallet.digital_received = 
+      Number(adminWallet.digital_received) 
+      + (parseFloat(order.order_amount) - parseFloat(order.partially_paid_amount || '0'));
   } else if (transactionData.receivedBy === false) {
-    // Manual payment
-    adminWallet.manual_received += parseFloat(order.order_amount) - parseFloat(order.partially_paid_amount || '0');
+    adminWallet.manual_received = 
+      Number(adminWallet.manual_received) 
+      + (parseFloat(order.order_amount) - parseFloat(order.partially_paid_amount || '0'));
   }
 
-  // If not self-delivery, admin gets delivery charge commission
   const hasSelfDelivery = 
     (restaurant.restaurant_model === 'subscription') ||
     (restaurant.restaurant_model !== 'subscription' && restaurant.self_delivery_system === 1);
 
   if (!hasSelfDelivery) {
-    adminWallet.delivery_charge += transactionData.deliveryCharge;
+    adminWallet.delivery_charge = 
+      Number(adminWallet.delivery_charge) 
+      + Number(transactionData.deliveryCharge);
   }
 
   adminWallet.updated_at = new Date();
 
-  // 4. Update Restaurant Wallet
-  restaurantWallet.total_earning += transactionData.restaurantAmount;
+  // 4. Update Restaurant Wallet (FORCE NUMBER TYPE)
+  restaurantWallet.total_earning = 
+    Number(restaurantWallet.total_earning) 
+    + Number(transactionData.restaurantAmount);
 
   if (transactionData.receivedBy === 'restaurant') {
-    // COD - restaurant collects cash
-    restaurantWallet.collected_cash += parseFloat(order.order_amount) - parseFloat(order.partially_paid_amount || '0');
+    restaurantWallet.collected_cash = 
+      Number(restaurantWallet.collected_cash) 
+      + (parseFloat(order.order_amount) - parseFloat(order.partially_paid_amount || '0'));
   }
 
-  // If self-delivery, restaurant gets delivery fees
   if (hasSelfDelivery) {
-    restaurantWallet.total_earning += parseFloat(order.delivery_charge || '0') + parseFloat(order.dm_tips || '0');
+    restaurantWallet.total_earning = 
+      Number(restaurantWallet.total_earning) 
+      + parseFloat(order.delivery_charge || '0') 
+      + parseFloat(order.dm_tips || '0');
   }
 
   restaurantWallet.updated_at = new Date();
@@ -370,6 +381,8 @@ private async updateWallets(
   this.logger.log(`✅ Wallets updated:`);
   this.logger.log(`   Admin commission: +$${transactionData.adminCommission.toFixed(2)}`);
   this.logger.log(`   Restaurant earning: +$${transactionData.restaurantAmount.toFixed(2)}`);
+  this.logger.log(`   Admin wallet total: $${Number(adminWallet.total_commission_earning).toFixed(2)}`);
+  this.logger.log(`   Restaurant wallet total: $${Number(restaurantWallet.total_earning).toFixed(2)}`);
 }
 
   /**
