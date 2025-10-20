@@ -4,6 +4,8 @@ import { EntityManager, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderTransaction } from '../entities/order-transaction.entity';
 import { OrderPayment } from '../entities/order-payment.entity';
+import { AdminWallet } from '../entities/admin-wallet.entity';
+import { RestaurantWallet } from '../entities/restaurant-wallet.entity';
 
 interface Restaurant {
   id: number;
@@ -24,6 +26,10 @@ export class PaymentTransactionService {
     private transactionRepo: Repository<OrderTransaction>,
     @InjectRepository(OrderPayment)
     private paymentRepo: Repository<OrderPayment>,
+    @InjectRepository(AdminWallet)
+    private adminWalletRepo: Repository<AdminWallet>,
+    @InjectRepository(RestaurantWallet)
+    private restaurantWalletRepo: Repository<RestaurantWallet>,
   ) {}
 
   /**
@@ -63,7 +69,10 @@ export class PaymentTransactionService {
       // 5. Create transaction record
       await this.saveTransaction(manager, order, restaurant, transactionData);
 
-      // 6. Update payment status
+      // 6. Update wallets (THIS UPDATES THE GRAPH!) ✨ ADD THIS
+      await this.updateWallets(manager, order, restaurant, transactionData);
+
+      // 7. Update payment status
       await this.updatePaymentStatus(manager, order);
 
       this.logger.log(`✅ Transaction created successfully for order ${order.id}`);
@@ -272,6 +281,100 @@ export class PaymentTransactionService {
   }
 
   /**
+ * Update wallet balances (THIS IS WHAT UPDATES THE GRAPH!)
+ * Replicates Laravel's wallet update logic (lines 142-203 in OrderLogic.php)
+ */
+private async updateWallets(
+  manager: EntityManager,
+  order: Order,
+  restaurant: Restaurant,
+  transactionData: any,
+) {
+  this.logger.log(`💳 Updating wallet balances for order ${order.id}`);
+
+  // 1. Get or create Admin Wallet (admin_id = 1)
+  let adminWallet = await manager.findOne(AdminWallet, {
+    where: { admin_id: 1 },
+  });
+
+  if (!adminWallet) {
+    adminWallet = manager.create(AdminWallet, {
+      admin_id: 1,
+      total_commission_earning: 0,
+      digital_received: 0,
+      manual_received: 0,
+      delivery_charge: 0,
+      total_withdrawn: 0,
+      pending_withdraw: 0,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+  }
+
+  // 2. Get or create Restaurant Wallet
+  let restaurantWallet = await manager.findOne(RestaurantWallet, {
+    where: { vendor_id: restaurant.vendor_id },
+  });
+
+  if (!restaurantWallet) {
+    restaurantWallet = manager.create(RestaurantWallet, {
+      vendor_id: restaurant.vendor_id,
+      total_earning: 0,
+      total_withdrawn: 0,
+      pending_withdraw: 0,
+      collected_cash: 0,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+  }
+
+  // 3. Update Admin Wallet
+  adminWallet.total_commission_earning += transactionData.adminCommission + transactionData.deliveryFeeCommission;
+  
+  if (transactionData.receivedBy === 'admin') {
+    // Digital payment - admin receives
+    adminWallet.digital_received += parseFloat(order.order_amount) - parseFloat(order.partially_paid_amount || '0');
+  } else if (transactionData.receivedBy === false) {
+    // Manual payment
+    adminWallet.manual_received += parseFloat(order.order_amount) - parseFloat(order.partially_paid_amount || '0');
+  }
+
+  // If not self-delivery, admin gets delivery charge commission
+  const hasSelfDelivery = 
+    (restaurant.restaurant_model === 'subscription') ||
+    (restaurant.restaurant_model !== 'subscription' && restaurant.self_delivery_system === 1);
+
+  if (!hasSelfDelivery) {
+    adminWallet.delivery_charge += transactionData.deliveryCharge;
+  }
+
+  adminWallet.updated_at = new Date();
+
+  // 4. Update Restaurant Wallet
+  restaurantWallet.total_earning += transactionData.restaurantAmount;
+
+  if (transactionData.receivedBy === 'restaurant') {
+    // COD - restaurant collects cash
+    restaurantWallet.collected_cash += parseFloat(order.order_amount) - parseFloat(order.partially_paid_amount || '0');
+  }
+
+  // If self-delivery, restaurant gets delivery fees
+  if (hasSelfDelivery) {
+    restaurantWallet.total_earning += parseFloat(order.delivery_charge || '0') + parseFloat(order.dm_tips || '0');
+  }
+
+  restaurantWallet.updated_at = new Date();
+
+  // 5. Save wallets
+  await manager.save(AdminWallet, adminWallet);
+  await manager.save(RestaurantWallet, restaurantWallet);
+
+  this.logger.log(`✅ Wallets updated:`);
+  this.logger.log(`   Admin commission: +$${transactionData.adminCommission.toFixed(2)}`);
+  this.logger.log(`   Restaurant earning: +$${transactionData.restaurantAmount.toFixed(2)}`);
+}
+
+  /**
    * Update payment status and unpaid records
    */
   private async updatePaymentStatus(manager: EntityManager, order: Order) {
@@ -292,4 +395,6 @@ export class PaymentTransactionService {
 
     this.logger.log(`✅ Payment status updated to 'paid' for order ${order.id}`);
   }
+
+  
 }

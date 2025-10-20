@@ -12,10 +12,12 @@ import { RedisModule } from 'src/redis/redis.module';
 import { OrderTransaction } from './entities/order-transaction.entity';
 import { OrderPayment } from './entities/order-payment.entity';
 import { PaymentTransactionService } from './services/payment-transaction.service';
+import { AdminWallet } from './entities/admin-wallet.entity';
+import { RestaurantWallet } from './entities/restaurant-wallet.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderDetail, DeliveryMan, OrderTransaction, OrderPayment]),
+    TypeOrmModule.forFeature([Order, OrderDetail, DeliveryMan, OrderTransaction, OrderPayment, AdminWallet, RestaurantWallet]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
