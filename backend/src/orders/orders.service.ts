@@ -57,7 +57,7 @@ export class OrdersService {
     const orders = await this.orderRepo.find({
       where: {
         restaurant_id: restaurantId,
-        order_status: In(['pending', 'confirmed', 'processing', 'handover']),
+        order_status: In(['pending', 'confirmed', 'processing', 'handover', 'picked_up']),
       },
       relations: ['details'],
       order: {
