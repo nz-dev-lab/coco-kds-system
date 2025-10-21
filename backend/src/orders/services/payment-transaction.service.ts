@@ -130,108 +130,135 @@ export class PaymentTransactionService {
    * This is the core logic from Laravel's OrderLogic::create_transaction()
    */
   private async calculateTransactionAmounts(
-    order: Order,
-    restaurant: Restaurant,
-    restaurantSub: any | null,
-  ) {
-    // Get commission rate
-    const defaultCommission = 10; // TODO: Get from business_settings
-    const commissionRate = restaurant.comission ?? defaultCommission;
+  order: Order,
+  restaurant: Restaurant,
+  restaurantSub: any | null,
+) {
+  // Get commission rate
+  const defaultCommission = 10; // TODO: Get from business_settings
+  const commissionRate = restaurant.comission ?? defaultCommission;
 
-    // Calculate base order amount (excluding fees)
-    const orderAmount = 
-      parseFloat(order.order_amount) 
-      - parseFloat(order.additional_charge || '0')
-      - parseFloat(order.extra_packaging_amount || '0')
-      - parseFloat(order.delivery_charge || '0')
-      - parseFloat(order.total_tax_amount || '0')
-      - parseFloat(order.dm_tips || '0')
-      + parseFloat(order.coupon_discount_amount || '0')
-      + parseFloat(order.restaurant_discount_amount || '0')
-      + parseFloat(order.ref_bonus_amount || '0');
+  // Calculate base order amount (excluding fees)
+  const orderAmount = 
+    parseFloat(order.order_amount) 
+    - parseFloat(order.additional_charge || '0')
+    - parseFloat(order.extra_packaging_amount || '0')
+    - parseFloat(order.delivery_charge || '0')
+    - parseFloat(order.total_tax_amount || '0')
+    - parseFloat(order.dm_tips || '0')
+    + parseFloat(order.coupon_discount_amount || '0')
+    + parseFloat(order.restaurant_discount_amount || '0')
+    + parseFloat(order.ref_bonus_amount || '0');
 
-    // Determine commission based on restaurant model
-    let commissionAmount = 0;
-    let subscriptionMode = 0;
-    let commissionPercentage = 0;
+  // Determine commission based on restaurant model
+  let commissionAmount = 0;
+  let subscriptionMode = 0;
+  let commissionPercentage = 0;
 
-    if (restaurant.restaurant_model === 'subscription' && restaurantSub) {
-      // Subscription restaurants pay NO commission
-      commissionAmount = 0;
-      subscriptionMode = 1;
-      commissionPercentage = 0;
-      this.logger.log(`Restaurant is subscribed - NO COMMISSION`);
-    } else {
-      // Commission restaurants pay percentage
-      commissionAmount = (orderAmount / 100) * commissionRate;
-      subscriptionMode = 0;
-      commissionPercentage = commissionRate;
-      this.logger.log(`Commission restaurant - ${commissionPercentage}% = $${commissionAmount.toFixed(2)}`);
-    }
-
-    // Calculate delivery charge commission
-    let commissionOnDelivery = 0;
-    let commissionOnActualDeliveryFee = 0;
-
-    const hasSelfDelivery = 
-      (restaurant.restaurant_model === 'subscription' && restaurantSub?.self_delivery === 1) ||
-      (restaurant.restaurant_model !== 'subscription' && restaurant.self_delivery_system === 1);
-
-    if (!hasSelfDelivery) {
-      const deliveryChargeCommissionPercentage = 10; // TODO: Get from business_settings
-      commissionOnDelivery = (deliveryChargeCommissionPercentage / 100) * parseFloat(order.original_delivery_charge || '0');
-      commissionOnActualDeliveryFee = parseFloat(order.delivery_charge) > 0 ? commissionOnDelivery : 0;
-    }
-
-    // Calculate subsidies and discounts
-    const adminSubsidy = order.free_delivery_by === 'admin' ? parseFloat(order.original_delivery_charge || '0') : 0;
-    const restaurantSubsidy = order.free_delivery_by === 'vendor' ? parseFloat(order.original_delivery_charge || '0') : 0;
-    
-    const adminCouponDiscount = order.coupon_created_by === 'admin' ? parseFloat(order.coupon_discount_amount || '0') : 0;
-    const restaurantCouponDiscount = order.coupon_created_by === 'vendor' ? parseFloat(order.coupon_discount_amount || '0') : 0;
-    
-    const restaurantDiscountAmount = parseFloat(order.restaurant_discount_amount || '0');
-    const refBonusAmount = parseFloat(order.ref_bonus_amount || '0');
-
-    // Calculate restaurant amount
-    const restaurantAmount = 
-      orderAmount 
-      + parseFloat(order.total_tax_amount || '0')
-      + parseFloat(order.extra_packaging_amount || '0')
-      - commissionAmount
-      - restaurantCouponDiscount;
-
-    // Calculate admin commission
-    const adminCommission = 
-      commissionAmount 
-      + parseFloat(order.additional_charge || '0')
-      - adminSubsidy
-      - adminCouponDiscount
-      - restaurantDiscountAmount;
-
-    // Determine who received payment
-    const receivedBy = 
-      order.payment_method === 'cash_on_delivery' 
-        ? 'restaurant'
-        : 'admin';
-
-    return {
-      orderAmount: parseFloat(order.order_amount),
-      restaurantAmount,
-      adminCommission,
-      commissionAmount,
-      commissionPercentage,
-      subscriptionMode,
-      deliveryCharge: parseFloat(order.delivery_charge || '0') - commissionOnActualDeliveryFee,
-      originalDeliveryCharge: parseFloat(order.original_delivery_charge || '0') - commissionOnDelivery,
-      deliveryFeeCommission: commissionOnActualDeliveryFee,
-      tax: parseFloat(order.total_tax_amount || '0'),
-      adminExpense: adminSubsidy + adminCouponDiscount + restaurantDiscountAmount + refBonusAmount,
-      restaurantExpense: restaurantSubsidy + restaurantCouponDiscount,
-      discountAmountByRestaurant: restaurantCouponDiscount,
-      receivedBy,
-    };
+  if (restaurant.restaurant_model === 'subscription' && restaurantSub) {
+    // Subscription restaurants pay NO commission
+    commissionAmount = 0;
+    subscriptionMode = 1;
+    commissionPercentage = 0;
+    this.logger.log(`Restaurant is subscribed - NO COMMISSION`);
+  } else {
+    // Commission restaurants pay percentage
+    commissionAmount = (orderAmount / 100) * commissionRate;
+    subscriptionMode = 0;
+    commissionPercentage = commissionRate;
+    this.logger.log(`Commission restaurant - ${commissionPercentage}% = $${commissionAmount.toFixed(2)}`);
   }
+
+  // Calculate delivery charge commission
+  let commissionOnDelivery = 0;
+  let commissionOnActualDeliveryFee = 0;
+
+  const hasSelfDelivery = 
+    (restaurant.restaurant_model === 'subscription' && restaurantSub?.self_delivery === 1) ||
+    (restaurant.restaurant_model !== 'subscription' && restaurant.self_delivery_system === 1);
+
+  if (!hasSelfDelivery) {
+    const deliveryChargeCommissionPercentage = 10; // TODO: Get from business_settings
+    commissionOnDelivery = (deliveryChargeCommissionPercentage / 100) * parseFloat(order.original_delivery_charge || '0');
+    commissionOnActualDeliveryFee = parseFloat(order.delivery_charge) > 0 ? commissionOnDelivery : 0;
+  }
+
+  // Calculate subsidies and discounts
+  const adminSubsidy = order.free_delivery_by === 'admin' ? parseFloat(order.original_delivery_charge || '0') : 0;
+  const restaurantSubsidy = order.free_delivery_by === 'vendor' ? parseFloat(order.original_delivery_charge || '0') : 0;
+  
+  const adminCouponDiscount = order.coupon_created_by === 'admin' ? parseFloat(order.coupon_discount_amount || '0') : 0;
+  const restaurantCouponDiscount = order.coupon_created_by === 'vendor' ? parseFloat(order.coupon_discount_amount || '0') : 0;
+  
+  // ✨ FIX: Split restaurant_discount_amount based on who gave it
+  let adminRestaurantDiscount = 0;
+  let restaurantDiscountExpense = 0;
+
+  const restaurantDiscountAmount = parseFloat(order.restaurant_discount_amount || '0');
+
+  if (restaurantDiscountAmount > 0) {
+    if (order.discount_on_product_by === 'vendor') {
+      // Restaurant gave discount
+      if (restaurant.restaurant_model === 'subscription' && restaurantSub) {
+        // Subscription: Restaurant pays full discount
+        restaurantDiscountExpense = restaurantDiscountAmount;
+        this.logger.log(`Restaurant (subscription) pays full discount: $${restaurantDiscountAmount.toFixed(2)}`);
+      } else {
+        // Commission: Split the discount proportionally
+        adminRestaurantDiscount = (restaurantDiscountAmount / 100) * commissionRate;
+        restaurantDiscountExpense = restaurantDiscountAmount - adminRestaurantDiscount;
+        this.logger.log(`Discount split - Admin: $${adminRestaurantDiscount.toFixed(2)}, Restaurant: $${restaurantDiscountExpense.toFixed(2)}`);
+      }
+    } else if (order.discount_on_product_by === 'admin') {
+      // Admin gave discount - admin pays
+      adminRestaurantDiscount = restaurantDiscountAmount;
+      this.logger.log(`Admin pays discount: $${restaurantDiscountAmount.toFixed(2)}`);
+    }
+  }
+
+  const refBonusAmount = parseFloat(order.ref_bonus_amount || '0');
+
+  // Calculate restaurant amount
+  const restaurantAmount = 
+    orderAmount 
+    + parseFloat(order.total_tax_amount || '0')
+    + parseFloat(order.extra_packaging_amount || '0')
+    - commissionAmount
+    - restaurantCouponDiscount
+    - restaurantDiscountExpense;  // ✨ Subtract restaurant's discount expense
+
+  // Calculate admin commission
+  const adminCommission = 
+    commissionAmount 
+    + parseFloat(order.additional_charge || '0')
+    - adminSubsidy
+    - adminCouponDiscount
+    - adminRestaurantDiscount  // ✨ Subtract admin's share of discount
+    - refBonusAmount;
+
+  // Determine who received payment
+  const receivedBy = 
+    order.payment_method === 'cash_on_delivery' 
+      ? 'restaurant'
+      : 'admin';
+
+  return {
+    orderAmount: parseFloat(order.order_amount),
+    restaurantAmount,
+    adminCommission,
+    commissionAmount,
+    commissionPercentage,
+    subscriptionMode,
+    deliveryCharge: parseFloat(order.delivery_charge || '0') - commissionOnActualDeliveryFee,
+    originalDeliveryCharge: parseFloat(order.original_delivery_charge || '0') - commissionOnDelivery,
+    deliveryFeeCommission: commissionOnActualDeliveryFee,
+    tax: parseFloat(order.total_tax_amount || '0'),
+    adminExpense: adminSubsidy + adminCouponDiscount + adminRestaurantDiscount + refBonusAmount,  // ✨ Updated
+    restaurantExpense: restaurantSubsidy + restaurantCouponDiscount + restaurantDiscountExpense,  // ✨ Updated
+    discountAmountByRestaurant: restaurantCouponDiscount + restaurantDiscountExpense + restaurantSubsidy,  // ✨ Updated
+    receivedBy,
+  };
+}
 
   /**
    * Save transaction to database
@@ -242,6 +269,7 @@ export class PaymentTransactionService {
     restaurant: Restaurant,
     transactionData: any,
   ) {
+    const now = new Date(); 
     const transaction = manager.create(OrderTransaction, {
       vendor_id: restaurant.vendor_id,
       delivery_man_id: order.delivery_man_id,
@@ -266,6 +294,8 @@ export class PaymentTransactionService {
       additional_charge: parseFloat(order.additional_charge || '0'),
       extra_packaging_amount: parseFloat(order.extra_packaging_amount || '0'),
       ref_bonus_amount: parseFloat(order.ref_bonus_amount || '0'),
+      created_at: now,  // ✨ ADD THIS
+      updated_at: now,
     });
 
     await manager.save(transaction);
