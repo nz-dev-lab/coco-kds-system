@@ -64,6 +64,7 @@ export class PaymentTransactionService {
         order,
         restaurant,
         restaurantSub,
+        manager
       );
 
       // 5. Create transaction record
@@ -133,10 +134,20 @@ export class PaymentTransactionService {
   order: Order,
   restaurant: Restaurant,
   restaurantSub: any | null,
+  manager: EntityManager,
 ) {
   // Get commission rate
-  const defaultCommission = 10; // TODO: Get from business_settings
-  const commissionRate = restaurant.comission ?? defaultCommission;
+  let commissionRate: number;
+  
+  if (restaurant.comission !== null && restaurant.comission !== undefined) {
+    // Restaurant has custom commission rate
+    commissionRate = parseFloat(restaurant.comission.toString());
+    this.logger.log(`Restaurant custom commission: ${commissionRate}%`);
+  } else {
+    // Use system default from business_settings
+    commissionRate = await this.getSystemDefaultCommission(manager);
+    this.logger.log(`Using system default commission: ${commissionRate}%`);
+  }
 
   // Calculate base order amount (excluding fees)
   const orderAmount = 
@@ -413,6 +424,32 @@ private async updateWallets(
   this.logger.log(`   Restaurant earning: +$${transactionData.restaurantAmount.toFixed(2)}`);
   this.logger.log(`   Admin wallet total: $${Number(adminWallet.total_commission_earning).toFixed(2)}`);
   this.logger.log(`   Restaurant wallet total: $${Number(restaurantWallet.total_earning).toFixed(2)}`);
+}
+
+/**
+ * Get system default commission from business_settings
+ */
+private async getSystemDefaultCommission(manager: EntityManager): Promise<number> {
+  try {
+    const setting = await manager
+      .createQueryBuilder()
+      .select('value')
+      .from('business_settings', 'bs')
+      .where("bs.key = 'admin_commission'")
+      .getRawOne();
+    
+    if (setting && setting.value) {
+      const commission = parseFloat(setting.value);
+      this.logger.log(`✅ System default commission from DB: ${commission}%`);
+      return commission;
+    }
+    
+    this.logger.warn('⚠️ admin_commission not found in business_settings, defaulting to 0');
+    return 0;
+  } catch (error) {
+    this.logger.error('❌ Failed to fetch admin_commission from business_settings:', error);
+    return 0; // Fallback to 0 if query fails
+  }
 }
 
   /**
