@@ -10,6 +10,7 @@ import { useLiveClock } from '../hooks/useLiveClock'; // NEW: Live clock hook
 export default function Dashboard() {
   const dispatch = useAppDispatch();
   const { orders, loading, error } = useAppSelector((state) => state.orders);
+  const sidebarOpen = useAppSelector((state) => state.ui.sidebarOpen); 
   
   // Live clock that updates every second
   const currentTime = useLiveClock();
@@ -29,7 +30,15 @@ export default function Dashboard() {
   }, [dispatch]);
 
   // Filter out delivered orders
-  const activeOrders = orders.filter((order) => order.order_status !== 'delivered');
+  const activeOrders = orders.filter((order) => {
+  // Exclude delivered orders
+  if (order.order_status === 'delivered') return false;
+  
+  // Exclude picked_up orders (they go to Dispatch page)
+  if (order.order_status === 'picked_up') return false;
+  
+  return true;
+});
 
   // Sort orders by status priority first, then by creation time (newest first)
   const statusPriority: Record<string, number> = {
@@ -121,7 +130,7 @@ export default function Dashboard() {
             <span className="text-xs text-slate-600 dark:text-kds-text-muted">Pending</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+            <div className="w-3 h-3 rounded-full bg-teal-600"></div>
             <span className="text-xs text-slate-600 dark:text-kds-text-muted">Confirmed</span>
           </div>
           <div className="flex items-center gap-2">
@@ -158,7 +167,11 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-max">
+          <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max ${
+  sidebarOpen 
+    ? 'xl:grid-cols-3 2xl:grid-cols-4'
+    : 'xl:grid-cols-4 2xl:grid-cols-5'
+}`}>
             {sortedOrders.map((order) => (
               <OrderCard key={order.id} order={order} />
             ))}

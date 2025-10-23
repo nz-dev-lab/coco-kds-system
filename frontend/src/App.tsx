@@ -5,6 +5,7 @@ import MainLayout from './components/Layout/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import Dispatch from './pages/Dispatch';
 
 // Temporary placeholder components
 const OrdersPage = () => (
@@ -56,6 +57,7 @@ function App() {
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/orders" element={<OrdersPage />} />
+                  <Route path="/dispatch" element={<Dispatch />} />
                   <Route path="/history" element={<HistoryPage />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -30,7 +30,7 @@ interface OrderItem {
 interface Order {
   id: string;
   restaurant_id: string;
-  order_status: 'pending' | 'confirmed' | 'processing' | 'handover' | 'delivered';
+  order_status: 'pending' | 'confirmed' | 'processing' | 'handover' |'picked_up' | 'delivered';
   order_type: 'delivery' | 'take_away' | 'dine_in';
   payment_method: string;
   order_amount: string;
@@ -46,6 +46,8 @@ interface Order {
   item_count: number;
   customer_name?: string | null;
   delivery_address?: DeliveryAddress | null;
+  bumped_at?: string;        // When order was bumped
+  picked_up?: boolean;        // For delivery orders (picked up by delivery man)
 }
 
 interface OrdersState {
@@ -112,7 +114,7 @@ export const updateOrderStatus = createAsyncThunk(
   }
 );
 
-// ✨ NEW: Assign delivery man to order
+// Assign delivery man to order
 export const assignDeliveryMan = createAsyncThunk(
   'orders/assignDeliveryMan',
   async (
@@ -141,6 +143,25 @@ export const assignDeliveryMan = createAsyncThunk(
       return rejectWithValue(
         error.response?.data?.message || 'Failed to assign delivery man'
       );
+    }
+  }
+);
+
+// Bump order (mark as picked up for delivery, or completed for takeaway/dine-in)
+export const bumpOrder = createAsyncThunk(
+  'orders/bumpOrder',
+  async ({ orderId, orderType }: { orderId: string; orderType: string }, { rejectWithValue }) => {
+    try {
+      console.log('🔄 Bumping order:', orderId, orderType);
+      
+      // For delivery orders, we don't change backend status (stays at handover)
+      // For takeaway/dine-in, backend status changes to delivered
+      // This action is mainly for frontend state management
+      
+      return { orderId, orderType, bumpedAt: new Date().toISOString() };
+    } catch (error: any) {
+      console.error('❌ Failed to bump order:', error);
+      return rejectWithValue(error.message || 'Failed to bump order');
     }
   }
 );
@@ -196,7 +217,7 @@ const ordersSlice = createSlice({
           console.log('API response has items?', action.payload.items?.length);
           console.log('API response has details?', action.payload.details?.length);
           
-          // ✨ Transform details to items if needed
+          // Transform details to items if needed
           let items = action.payload.items || existingOrder.items;
           
           if (!items && action.payload.details) {
@@ -239,7 +260,7 @@ const ordersSlice = createSlice({
         }
       })
       
-      // ✨ Assign delivery man
+      // Assign delivery man
       .addCase(assignDeliveryMan.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -272,6 +293,35 @@ const ordersSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
         console.error('❌ Delivery man assignment failed:', action.payload);
+      })
+      
+      // Bump order
+      .addCase(bumpOrder.fulfilled, (state, action) => {
+        const { orderId, orderType, bumpedAt } = action.payload;
+        
+        console.log('📦 Order bumped:', orderId);
+        
+        if (orderType === 'delivery') {
+          // For delivery orders: Mark as "picked_up" but keep in state
+          // (will move to Dispatch view later)
+          const index = state.orders.findIndex(o => o.id === orderId);
+          if (index !== -1) {
+            state.orders[index] = {
+              ...state.orders[index],
+              bumped_at: bumpedAt,
+              picked_up: true,
+            };
+          }
+        } else {
+          // For takeaway/dine-in: Remove from active orders
+          state.orders = state.orders.filter(o => o.id !== orderId);
+        }
+        
+        console.log('✅ Order bumped successfully');
+      })
+      .addCase(bumpOrder.rejected, (state, action) => {
+        console.error('❌ Bump failed:', action.payload);
+        state.error = action.payload as string;
       });
   },
 });

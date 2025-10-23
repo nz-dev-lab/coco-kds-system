@@ -1,7 +1,7 @@
 // components/Sidebar.tsx
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, ClipboardList, Settings, ChevronLeft, ChevronRight, History } from 'lucide-react';
+import { Home, ClipboardList, Settings, ChevronLeft, ChevronRight, History, Truck } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { toggleSidebar } from '../store/slices/uiSlice';
 
@@ -18,6 +18,12 @@ const navigationItems: NavItem[] = [
     label: 'Dashboard',
     icon: Home,
     path: '/dashboard',
+  },
+  {
+    id: 'dispatch',
+    label: 'Dispatch',
+    icon: Truck,
+    path: '/dispatch',
   },
   {
     id: 'orders',
