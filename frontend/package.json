@@ -85,10 +85,13 @@
       "target": [
         "AppImage"
       ],
-      "category": "Office",
-      "afterInstall": "build/after-install.sh",
-      "afterRemove": "build/after-remove.sh"
+      "category": "Office"
+      
     },
+    "deb": {
+  "afterInstall": "build/after-install.sh",
+  "afterRemove": "build/after-remove.sh"
+},
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
