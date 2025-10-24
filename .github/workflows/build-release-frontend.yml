@@ -1,4 +1,5 @@
 name: Build and Release KDS Frontend
+
 on:
   push:
     tags:
@@ -7,9 +8,11 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -29,27 +32,16 @@ jobs:
         working-directory: ./frontend
         run: npm run build
         env:
+          NODE_ENV: production  # ⭐ SET THIS
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
-
-      # - name: Add NSIS AccessControl plugin (Windows only)
-      #   if: matrix.os == 'windows-latest'
-      #   run: |
-      #     $pluginDir = "$env:LOCALAPPDATA\electron-builder\Cache\nsis\nsis-3.0.4.1\Plugins\x86-unicode"
-      #     if (!(Test-Path $pluginDir)) { New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null }
-      #     Write-Host "Downloading NSIS AccessControl plugin..."
-      #     Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/nsis/Plugins/AccessControl/AccessControl.zip" -OutFile "AccessControl.zip"
-      #     Expand-Archive AccessControl.zip -DestinationPath $pluginDir
-      #     Write-Host "AccessControl plugin installed successfully in: $pluginDir"
-
-      
       
       - name: Build Electron application
         working-directory: ./frontend
         run: npm run electron:build
+        env:
+          NODE_ENV: production  # ⭐ SET THIS TOO
       
-      # Direct upload to release (no artifacts = no storage limit)
- # Direct upload to release (additive uploads from all OS)
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -58,6 +50,6 @@ jobs:
           tag_name: ${{ github.ref_name }}
           draft: false
           fail_on_unmatched_files: false
-          append_release_body: true   # ✅ allows parallel additive uploads
+          append_release_body: true
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}

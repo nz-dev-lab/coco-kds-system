@@ -1,6 +1,6 @@
 {
   "name": "kds-frontend",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Kitchen Display System - Electron + React",
   "main": "dist-electron/main.js",
   "author": "Nz-Dev-Lab",
@@ -13,9 +13,9 @@
     "dev": "npm run build:electron && concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
     "dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
-    "build": "tsc && vite build && npm run build:electron",
-    "build:electron": "tsc -p electron/tsconfig.json",
-    "electron:build": "npm run build && electron-builder --publish never",
+    "build": "cross-env NODE_ENV=production tsc && vite build && npm run build:electron",
+    "build:electron": "cross-env NODE_ENV=production tsc -p electron/tsconfig.json",
+    "electron:build": "npm run build && cross-env NODE_ENV=production electron-builder --publish never",
     "preview": "vite preview"
   },
   "keywords": [],
@@ -62,17 +62,17 @@
       "package.json"
     ],
     "extraFiles": [
-    {
-      "from": "dist/sounds",
-      "to": "sounds",
-      "filter": ["**/*"]
-    }
-  ],
-  "asarUnpack": [
-    "**/*.mp3",
-    "**/*.wav",
-    "**/*.ogg"
-  ],
+      {
+        "from": "dist/sounds",
+        "to": "sounds",
+        "filter": ["**/*"]
+      }
+    ],
+    "asarUnpack": [
+      "**/*.mp3",
+      "**/*.wav",
+      "**/*.ogg"
+    ],
     "extraMetadata": {
       "main": "dist-electron/main.js"
     },
@@ -98,18 +98,16 @@
         "AppImage"
       ],
       "category": "Office"
-      
     },
     "deb": {
-  "afterInstall": "build/after-install.sh",
-  "afterRemove": "build/after-remove.sh"
-},
+      "afterInstall": "build/after-install.sh",
+      "afterRemove": "build/after-remove.sh"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-     
     }
   }
 }

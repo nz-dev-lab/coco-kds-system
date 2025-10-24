@@ -16,25 +16,21 @@ const isDev = process.env.NODE_ENV === 'development';
 
 // Configure auto-updater (only in production)
 if (!isDev) {
-  // Explicitly configure the update source
   autoUpdater.setFeedURL({
     provider: 'github',
     owner: 'nz-dev-lab',
     repo: 'coco-kds-releases',
   });
 
-  // Don't auto-download, let user decide
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
-  // Initial check on startup
   app.whenReady().then(() => {
     setTimeout(() => {
       autoUpdater.checkForUpdates();
-    }, 3000); // Wait 3 seconds after app starts
+    }, 3000);
   });
 
-  // Check for updates every 4 hours
   setInterval(() => {
     autoUpdater.checkForUpdates();
   }, 4 * 60 * 60 * 1000);
@@ -46,19 +42,28 @@ function createWindow() {
     height: 1080,
     minWidth: 1280,
     minHeight: 720,
-    frame: false, // Remove default window frame
-    titleBarStyle: 'hidden', // Hide title bar
-    fullscreen: !isDev, // Fullscreen in production, windowed in dev
+    frame: false,
+    titleBarStyle: 'hidden',
+    fullscreen: !isDev,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
+      webSecurity: false, // ⭐ CRITICAL: Allow loading from file:// protocol
     },
     autoHideMenuBar: true,
-    backgroundColor: '#0f172a', // Updated to match your kds-bg color
+    backgroundColor: '#0f172a',
     title: 'Kitchen Display System',
-    
+  });
+
+  // Enhanced error logging with correct event signatures
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    console.error('❌ Page failed to load:', errorCode, errorDescription, validatedURL);
+  });
+
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error('❌ Renderer process gone!', details.reason, details.exitCode);
   });
 
   // Load app
@@ -68,16 +73,43 @@ function createWindow() {
     console.log('🔧 Development mode - Loading from localhost:5173');
   } else {
     const indexPath = path.join(app.getAppPath(), 'dist', 'index.html');
-mainWindow.loadFile(indexPath)
-  .then(() => console.log('✅ Successfully loaded index.html'))
-  .catch((err) => console.error('❌ Failed to load:', err));
+    console.log('🚀 Production mode');
+    console.log('📂 App path:', app.getAppPath());
+    console.log('📄 Loading from:', indexPath);
+    
+    mainWindow.loadFile(indexPath)
+      .then(() => {
+        console.log('✅ Successfully loaded index.html');
+        console.log('🔗 Location will be:', `file://${indexPath}`);
+      })
+      .catch((err) => {
+        console.error('❌ Failed to load index.html:', err);
+        console.error('📂 Tried path:', indexPath);
+      });
+    
+    // Open DevTools automatically for debugging
+    mainWindow.webContents.openDevTools();
+    
+    // Log when DOM is ready
+    mainWindow.webContents.on('dom-ready', () => {
+      console.log('✅ DOM is ready');
+      
+      // Execute some checks in the renderer
+      mainWindow?.webContents.executeJavaScript(`
+        console.log('🔍 Diagnostic Info:');
+        console.log('Location:', window.location.href);
+        console.log('Base URI:', document.baseURI);
+        console.log('Root element exists:', !!document.getElementById('root'));
+        console.log('Scripts loaded:', document.scripts.length);
+        console.log('Script sources:', Array.from(document.scripts).map(s => s.src));
+      `).catch(err => console.error('Failed to execute diagnostic script:', err));
+    });
   }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 
-  // Setup auto-updater events
   if (!isDev && mainWindow) {
     setupAutoUpdater(mainWindow);
   }
@@ -112,12 +144,10 @@ ipcMain.on('window-fullscreen', () => {
   }
 });
 
-// Check if window is maximized
 ipcMain.handle('window-is-maximized', () => {
   return mainWindow?.isMaximized() || false;
 });
 
-// Listen for maximize/unmaximize events to update UI
 function setupMaximizeListeners() {
   if (mainWindow) {
     mainWindow.on('maximize', () => {
@@ -138,7 +168,6 @@ function setupAutoUpdater(window: BrowserWindow) {
   autoUpdater.on('update-available', (info) => {
     console.log('✅ Update available:', info.version);
     window.webContents.send('update_available', info);
-    // Automatically start download
     autoUpdater.downloadUpdate();
   });
 
@@ -148,7 +177,6 @@ function setupAutoUpdater(window: BrowserWindow) {
 
   autoUpdater.on('error', (error) => {
     console.error('❌ Auto-updater error:', error.message);
-    // Don't crash the app, just log the error
   });
 
   autoUpdater.on('download-progress', (progress) => {
@@ -159,10 +187,6 @@ function setupAutoUpdater(window: BrowserWindow) {
   autoUpdater.on('update-downloaded', (info) => {
     console.log('✅ Update downloaded:', info.version);
     window.webContents.send('update_downloaded', info);
-    // Optional: Auto-install after 30 seconds
-    // setTimeout(() => {
-    //   autoUpdater.quitAndInstall();
-    // }, 30000);
   });
 }
 
@@ -182,11 +206,7 @@ app.whenReady().then(() => {
   console.log(`📊 Total orders for restaurant ${restaurantId}:`, count);
 });
 
-// ==========================================
 // DATABASE IPC HANDLERS
-// ==========================================
-
-// Store completed order
 ipcMain.handle('db:add-completed-order', async (event, order) => {
   try {
     console.log('📦 Storing completed order:', order.id);
@@ -198,7 +218,6 @@ ipcMain.handle('db:add-completed-order', async (event, order) => {
   }
 });
 
-// Get daily statistics
 ipcMain.handle('db:get-daily-stats', async (event, date: string, restaurantId: string) => {
   try {
     console.log('📊 Getting daily stats for:', date, restaurantId);
@@ -210,7 +229,6 @@ ipcMain.handle('db:get-daily-stats', async (event, date: string, restaurantId: s
   }
 });
 
-// Get orders by date
 ipcMain.handle('db:get-orders-by-date', async (event, date: string, restaurantId: string) => {
   try {
     console.log('📋 Getting orders for date:', date, restaurantId);
@@ -222,7 +240,6 @@ ipcMain.handle('db:get-orders-by-date', async (event, date: string, restaurantId
   }
 });
 
-// Get revenue trend
 ipcMain.handle('db:get-revenue-trend', async (event, days: number, restaurantId: string) => {
   try {
     console.log('📈 Getting revenue trend for:', days, 'days', restaurantId);
@@ -234,7 +251,6 @@ ipcMain.handle('db:get-revenue-trend', async (event, days: number, restaurantId:
   }
 });
 
-// Cleanup old orders
 ipcMain.handle('db:cleanup-old-orders', async (event, days: number, restaurantId: string) => {
   try {
     console.log('🗑️ Cleaning up orders older than:', days, 'days for', restaurantId);
@@ -246,7 +262,6 @@ ipcMain.handle('db:cleanup-old-orders', async (event, days: number, restaurantId
   }
 });
 
-// Get total order count for restaurant
 ipcMain.handle('db:get-total-count', async (event, restaurantId: string) => {
   try {
     const result = statements.getTotalCount.get(restaurantId);
@@ -257,7 +272,6 @@ ipcMain.handle('db:get-total-count', async (event, restaurantId: string) => {
   }
 });
 
-// Close database on quit
 app.on('before-quit', () => {
   console.log('🔒 Closing database...');
   closeDatabase();
