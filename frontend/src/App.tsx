@@ -1,5 +1,5 @@
 // src/App.tsx
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'; // ⭐ Changed BrowserRouter to HashRouter
 import { useAppSelector } from './store/hooks';
 import MainLayout from './components/Layout/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -37,14 +37,14 @@ function App() {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
 
   return (
-    <BrowserRouter>
+    <HashRouter> {/* ⭐ Changed BrowserRouter to HashRouter */}
       <Routes>
         {/* Public Route: Login */}
-        <Route 
-          path="/login" 
+        <Route
+          path="/login"
           element={
             isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
-          } 
+          }
         />
 
         {/* Protected Routes: All others wrapped in MainLayout */}
@@ -67,7 +67,7 @@ function App() {
           }
         />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
