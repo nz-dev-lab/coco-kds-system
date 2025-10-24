@@ -44,6 +44,8 @@ jobs:
             frontend/release/latest*.yml
           repository: nz-dev-lab/coco-kds-releases
           tag_name: ${{ github.ref_name }}
+          draft: false
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
       
@@ -56,6 +58,8 @@ jobs:
             frontend/release/latest*.yml
           repository: nz-dev-lab/coco-kds-releases
           tag_name: ${{ github.ref_name }}
+          draft: false
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
       
@@ -68,5 +72,7 @@ jobs:
             frontend/release/latest*.yml
           repository: nz-dev-lab/coco-kds-releases
           tag_name: ${{ github.ref_name }}
+          draft: false
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
