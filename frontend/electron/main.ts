@@ -67,8 +67,10 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
     console.log('🔧 Development mode - Loading from localhost:5173');
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-    console.log('🚀 Production mode - Loading from local files');
+    const indexPath = path.join(app.getAppPath(), 'dist', 'index.html');
+mainWindow.loadFile(indexPath)
+  .then(() => console.log('✅ Successfully loaded index.html'))
+  .catch((err) => console.error('❌ Failed to load:', err));
   }
 
   mainWindow.on('closed', () => {

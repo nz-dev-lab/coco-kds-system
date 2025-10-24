@@ -68,6 +68,11 @@
       "filter": ["**/*"]
     }
   ],
+  "asarUnpack": [
+    "**/*.mp3",
+    "**/*.wav",
+    "**/*.ogg"
+  ],
     "extraMetadata": {
       "main": "dist-electron/main.js"
     },
