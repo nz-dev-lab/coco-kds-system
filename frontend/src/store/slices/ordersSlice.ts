@@ -2,7 +2,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-interface DeliveryAddress {
+export interface DeliveryAddress {
   contact_person_name: string;
   contact_person_number: string;
   contact_person_email?: string;
@@ -15,31 +15,31 @@ interface DeliveryAddress {
   latitude: string;
 }
 
-interface OrderItem {
+export interface OrderItem {
   id: string;
   food_id: string;
   name: string;
   quantity: number;
   price: string;
-  variant: string | null;
-  variations: any[];
-  add_ons: any[];
+  variant?: string | null;
+  variation: Array<{ type: string; name: string; price: string }>;
+  add_ons: Array<{ name: string; quantity: number; price: string }>;
   isReady?: boolean; // Frontend only
 }
 
-interface Order {
+export interface Order {
   id: string;
   restaurant_id: string;
   order_status: 'pending' | 'confirmed' | 'processing' | 'handover' |'picked_up' | 'delivered';
   order_type: 'delivery' | 'take_away' | 'dine_in';
-  payment_method: string;
-  order_amount: string;
-  processing_time: string | null;
-  order_note: string | null;
+  payment_method?: string;
+  order_amount?: string;
+  processing_time?: string | null;
+  order_note?: string | null;
   delivery_instruction: string | null;
   delivery_man_id?: string | null;
-  created_at: string;
-  schedule_at: string;
+  created_at?: string;
+  schedule_at?: string;
   order_age_minutes: number;
   is_scheduled: boolean;
   items: OrderItem[];
@@ -48,6 +48,12 @@ interface Order {
   delivery_address?: DeliveryAddress | null;
   bumped_at?: string;        // When order was bumped
   picked_up?: boolean;        // For delivery orders (picked up by delivery man)
+  delivery_charge: string;
+  total_tax_amount: string;
+  coupon_discount_amount?: string;
+  restaurant_discount_amount?: string;
+  dm_tips?: string;
+  additional_charge?: string
 }
 
 interface OrdersState {

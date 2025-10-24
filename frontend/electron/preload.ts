@@ -64,6 +64,28 @@ contextBridge.exposeInMainWorld('electron', {
     getTotalCount: (restaurantId: string) => 
       ipcRenderer.invoke('db:get-total-count', restaurantId),
   },
+
+  // Printer APIs
+  printer: {
+    /**
+     * Get list of available printers
+     */
+    getPrinters: () => ipcRenderer.invoke('get-printers'),
+    
+    /**
+     * Get the default printer
+     */
+    getDefaultPrinter: () => ipcRenderer.invoke('get-default-printer'),
+    
+    /**
+     * Print order HTML
+     * @param orderHtml - HTML string to print
+     * @param printerName - Optional printer name, uses default if not provided
+     */
+    printOrder: (orderHtml: string, printerName?: string) =>
+      ipcRenderer.invoke('print-order', orderHtml, printerName),
+  },
+
 });
 
 // Type declarations

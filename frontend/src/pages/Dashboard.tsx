@@ -58,8 +58,9 @@ export default function Dashboard() {
     }
     
     // Same status, sort by creation time (newest first)
-    const timeA = new Date(a.created_at).getTime();
-    const timeB = new Date(b.created_at).getTime();
+    // Use a safe fallback (0) when created_at may be undefined so Date() call is always valid.
+    const timeA = new Date(a.created_at ?? 0).getTime();
+    const timeB = new Date(b.created_at ?? 0).getTime();
     
     return timeB - timeA; // Newest first (descending order)
   });

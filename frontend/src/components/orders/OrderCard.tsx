@@ -11,9 +11,11 @@ import DeliveryAssignmentModal from './DeliveryAssignmentModal';
 import { assignDeliveryMan } from '@/store/slices/ordersSlice';
 import { toast } from 'react-hot-toast'; // or your toast library
 import { useOrderBump } from '../../hooks/useOrderBump';
+import { usePrintOrder } from '../../hooks/usePrintOrder';
 
 interface Order {
   id: string;
+  restaurant_id: string;
   order_status: 'pending' | 'confirmed' | 'processing' | 'handover' | 'picked_up'| 'delivered';
   order_type: 'delivery' | 'take_away' | 'dine_in';
   order_age_minutes: number;
@@ -21,24 +23,35 @@ interface Order {
   items: OrderItem[];
   order_note?: string | null;
   delivery_man_id?: string | null;
+  delivery_instruction: string | null;
   customer_name?: string | null;
   item_count: number;
   created_at?: string;
   schedule_at?: string;
+  is_scheduled: boolean;
   delivery_address?: any;
   order_amount?: string;
   payment_method?: string;
   bumped_at?: string;        // ← ADD THIS
-  picked_up?: boolean;        // ← ADD THIS (for delivery orders)
+  picked_up?: boolean;
+  delivery_charge: string;
+  total_tax_amount: string;
+  coupon_discount_amount?: string;
+  restaurant_discount_amount?: string;
+  dm_tips?: string;
+  additional_charge?: string        // ← ADD THIS (for delivery orders)
   
 }
 
 interface OrderItem {
   id: string;
+  food_id: string;
   name: string;
   quantity: number;
+  price: string;
   variant?: string | null;
-  add_ons?: any[];
+  variation: Array<{ type: string; name: string; price: string }>;
+  add_ons: Array<{ name: string; quantity: number; price: string }>;
   isReady?: boolean;
 }
 
@@ -51,6 +64,7 @@ export default function OrderCard({ order }: OrderCardProps) {
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const currentTime = useCurrentTime();
+  const { printWithSelection, isPrinting } = usePrintOrder();
 
   // Get restaurant ID from Redux auth state
   const restaurantId = useAppSelector((state) => state.auth.restaurant?.id);
@@ -152,8 +166,14 @@ const orderAge = order.created_at
     dispatch(toggleItemReady({ orderId: order.id, itemId }));
   };
 
-  const handlePrint = () => {
-    console.log('Print order:', order.id);
+ // Print handler
+  const handlePrint = async () => {
+    try {
+      console.log('🖨️ Print button clicked for order:', order.id);
+      await printWithSelection(order);
+    } catch (error) {
+      console.error('❌ Print error:', error);
+    }
   };
 
 const handleBump = async () => {
