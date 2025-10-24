@@ -100,7 +100,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            frontend/release/*.exe
+            frontend/release/KDS Setup *.exe
             frontend/release/latest*.yml
           repository: nz-dev-lab/coco-kds-releases
           tag_name: ${{ github.ref_name }}
