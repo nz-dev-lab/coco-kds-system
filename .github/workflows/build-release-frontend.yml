@@ -5,102 +5,45 @@ on:
       - 'frontend-v*.*.*'
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
       - name: Install dependencies
         working-directory: ./frontend
         run: npm ci
-      - name: Build
+      
+      - name: Build React application
         working-directory: ./frontend
         run: npm run build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
-      - name: Build Electron
+      
+      - name: Build Electron application
         working-directory: ./frontend
         run: npm run electron:build
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            frontend/release/*.AppImage
-            frontend/release/latest*.yml
-          repository: nz-dev-lab/coco-kds-releases
-          tag_name: ${{ github.ref_name }}
-          draft: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
-
-  build-macos:
-    needs: build-linux  # ← Wait for Linux
-    runs-on: macos-latest
-    steps:
-      # Same as Linux but macOS files
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install dependencies
-        working-directory: ./frontend
-        run: npm ci
-      - name: Build
-        working-directory: ./frontend
-        run: npm run build
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
-      - name: Build Electron
-        working-directory: ./frontend
-        run: npm run electron:build
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            frontend/release/*.dmg
-            frontend/release/latest*.yml
-          repository: nz-dev-lab/coco-kds-releases
-          tag_name: ${{ github.ref_name }}
-          draft: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
-
-  build-windows:
-    needs: build-macos
-    runs-on: windows-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install dependencies
-        working-directory: ./frontend
-        run: npm ci
-      - name: Build
-        working-directory: ./frontend
-        run: npm run build
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
-      - name: Build Electron
-        working-directory: ./frontend
-        run: npm run electron:build
-      - name: Upload to Release
+      
+      # Direct upload to release (no artifacts = no storage limit)
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: frontend/release/*
           repository: nz-dev-lab/coco-kds-releases
           tag_name: ${{ github.ref_name }}
           draft: false
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
