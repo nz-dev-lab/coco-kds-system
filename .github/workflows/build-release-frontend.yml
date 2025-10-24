@@ -31,6 +31,18 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
+
+      - name: Add NSIS AccessControl plugin (Windows only)
+        if: matrix.os == 'windows-latest'
+        run: |
+          $pluginDir = "$env:LOCALAPPDATA\electron-builder\Cache\nsis\nsis-3.0.4.1\Plugins\x86-unicode"
+          if (!(Test-Path $pluginDir)) { New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null }
+          Write-Host "Downloading NSIS AccessControl plugin..."
+          Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/nsis/Plugins/AccessControl/AccessControl.zip" -OutFile "AccessControl.zip"
+          Expand-Archive AccessControl.zip -DestinationPath $pluginDir
+          Write-Host "AccessControl plugin installed successfully in: $pluginDir"
+
+      
       
       - name: Build Electron application
         working-directory: ./frontend
