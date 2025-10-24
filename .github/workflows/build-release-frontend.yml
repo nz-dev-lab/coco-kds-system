@@ -74,10 +74,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
 
   build-windows:
-    needs: build-macos  # ← Wait for macOS
+    needs: build-macos
     runs-on: windows-latest
     steps:
-      # Same as above but Windows files
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Node.js
@@ -99,9 +98,7 @@ jobs:
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            frontend/release/KDS Setup *.exe
-            frontend/release/latest*.yml
+          files: frontend/release/*
           repository: nz-dev-lab/coco-kds-releases
           tag_name: ${{ github.ref_name }}
           draft: false
