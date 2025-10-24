@@ -61,6 +61,13 @@
       "dist-electron/**/*",
       "package.json"
     ],
+    "extraFiles": [
+    {
+      "from": "dist/sounds",
+      "to": "sounds",
+      "filter": ["**/*"]
+    }
+  ],
     "extraMetadata": {
       "main": "dist-electron/main.js"
     },

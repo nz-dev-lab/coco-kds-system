@@ -15,12 +15,12 @@ class AudioNotificationService {
 
   constructor() {
     // Load sound effects
-    this.chimeReady = new Audio('/sounds/chime-ready.mp3');
-    this.alarmOverdue = new Audio('/sounds/alarm-overdue.mp3');
-    
-    // Load voice files
-    this.voiceReady = new Audio('/sounds/ready-voice.mp3');
-    this.voiceOverdue = new Audio('/sounds/overdue-voice.mp3');
+      this.chimeReady = new Audio('./sounds/chime-ready.mp3');       // ✅ FIXED
+  this.alarmOverdue = new Audio('./sounds/alarm-overdue.mp3');   // ✅ FIXED
+  
+  // Load voice files
+  this.voiceReady = new Audio('./sounds/ready-voice.mp3');       // ✅ FIXED
+  this.voiceOverdue = new Audio('./sounds/overdue-voice.mp3'); 
     
     // Volumes will be set dynamically based on settings
     this.updateVolumes();
