@@ -49,13 +49,15 @@ jobs:
         run: npm run electron:build
       
       # Direct upload to release (no artifacts = no storage limit)
+ # Direct upload to release (additive uploads from all OS)
       - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: frontend/release/*
           repository: nz-dev-lab/coco-kds-releases
           tag_name: ${{ github.ref_name }}
           draft: false
           fail_on_unmatched_files: false
+          append_release_body: true   # ✅ allows parallel additive uploads
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
