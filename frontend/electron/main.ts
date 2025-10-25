@@ -281,11 +281,11 @@ ipcMain.handle('get-printers', async () => {
 
     // webContents.getPrinters() may be missing from your installed type defs.
     // Cast to a compatible shape (returns Electron.PrinterInfo[] synchronously).
-    const webContentsWithPrinters = win.webContents as unknown as {
-      getPrinters(): import('electron').PrinterInfo[];
-    };
+    // const webContentsWithPrinters = win.webContents as unknown as {
+    //   getPrinters(): import('electron').PrinterInfo[];
+    // };
 
-    const printers = webContentsWithPrinters.getPrinters();
+    const printers = await win.webContents.getPrintersAsync();
     console.log('📄 Available printers:', printers.map(p => p.name));
     return printers;
   } catch (error) {
@@ -382,11 +382,11 @@ ipcMain.handle('get-default-printer', async () => {
       throw new Error('No focused window');
     }
     
-    const webContentsWithPrinters = win.webContents as unknown as {
-      getPrinters(): import('electron').PrinterInfo[];
-    };
+    // const webContentsWithPrinters = win.webContents as unknown as {
+    //   getPrinters(): import('electron').PrinterInfo[];
+    // };
 
-    const printers = webContentsWithPrinters.getPrinters();
+    const printers = await win.webContents.getPrintersAsync();
     const defaultPrinter = printers.find(p => p.isDefault);
     
     console.log('🖨️ Default printer:', defaultPrinter?.name || 'None');

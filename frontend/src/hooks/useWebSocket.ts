@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addOrder, updateOrder } from '../store/slices/ordersSlice';
 import { io, Socket } from 'socket.io-client';
+import { Order } from '@/types/order.type';
 
 export function useWebSocket() {
   const dispatch = useAppDispatch();
@@ -11,7 +12,7 @@ export function useWebSocket() {
   const socketRef = useRef<Socket | null>(null);
 
   // Transform Laravel order format to frontend format
-  const transformOrder = (rawOrder: any) => {
+  const transformOrder = (rawOrder: any): Order | null => {
     try {
       console.log('Transforming order:', rawOrder);
       // Map 'details' to 'items' and transform structure
@@ -59,7 +60,7 @@ export function useWebSocket() {
           quantity: detail.quantity,
           price: detail.price.toString(),
           variant: detail.variant || null,
-          variations: variations,
+          variation: variations,
           add_ons: addOns,
           isReady: false,
         };
@@ -81,7 +82,6 @@ export function useWebSocket() {
         }
       }
 
-      // ✨ FIX: Use backend's calculated age (backend handles timezone correctly)
       const ageMinutes = rawOrder.order_age_minutes || 0;
 
       // Return transformed order
@@ -91,19 +91,25 @@ export function useWebSocket() {
         order_status: rawOrder.order_status,
         order_type: rawOrder.order_type,
         payment_method: rawOrder.payment_method,
-        order_amount: rawOrder.order_amount.toString(),
+        order_amount: rawOrder.order_amount?.toString() || '0.00',
         processing_time: rawOrder.processing_time,
         order_note: rawOrder.order_note,
         delivery_instruction: rawOrder.delivery_instruction,
-        created_at: rawOrder.created_at, // Backend now sends ISO UTC format
+        created_at: rawOrder.created_at || new Date().toISOString(),
         schedule_at: rawOrder.schedule_at,
-        order_age_minutes: ageMinutes, // ✨ Use backend's value
+        order_age_minutes: ageMinutes,
         is_scheduled: rawOrder.scheduled === 1,
         items: items,
         item_count: items.length,
         customer_name: customerName,
         delivery_address: deliveryAddress,
         delivery_man_id: rawOrder.delivery_man_id?.toString() || null,
+        delivery_charge: rawOrder.delivery_charge?.toString() || '0.00',
+        total_tax_amount: rawOrder.total_tax_amount?.toString() || '0.00',
+        coupon_discount_amount: rawOrder.coupon_discount_amount?.toString(),
+        restaurant_discount_amount: rawOrder.restaurant_discount_amount?.toString(),
+        dm_tips: rawOrder.dm_tips?.toString(),
+        additional_charge: rawOrder.additional_charge?.toString(),
       };
     } catch (error) {
       console.error('Error transforming order:', error);
@@ -111,8 +117,8 @@ export function useWebSocket() {
     }
   };
 
-  // ✨ NEW: Function to save completed delivery orders to SQLite
-  const saveDeliveredOrderToSQLite = async (order: any) => {
+  // Function to save completed delivery orders to SQLite
+  const saveDeliveredOrderToSQLite = async (order: Order) => {
     if (!restaurantId) {
       console.error('❌ Cannot save to SQLite: No restaurant ID');
       return;
@@ -123,11 +129,11 @@ export function useWebSocket() {
     try {
       const orderData = {
         id: order.id,
-        created_at: order.created_at,
+        created_at: order.created_at || new Date().toISOString(),
         completed_at: new Date().toISOString(),
         order_type: order.order_type,
         order_status: order.order_status,
-        order_amount: order.order_amount,
+        order_amount: order.order_amount || '0.00',
         payment_method: order.payment_method,
         item_count: order.item_count,
         items: order.items,
@@ -206,15 +212,12 @@ export function useWebSocket() {
       console.log('Has "details" key?', !!rawOrder.details);
       console.log('Has "items" key?', !!rawOrder.items);
       
-      // ✨ FIX: Check if already formatted (has items) or needs transform (has details)
-      let orderToDispatch;
+      let orderToDispatch: Order | null = null;
       
       if (rawOrder.items) {
-        // Already formatted by NestJS - use as-is
         console.log('✅ Order already formatted with items:', rawOrder.items.length);
-        orderToDispatch = rawOrder;
+        orderToDispatch = rawOrder as Order;
       } else if (rawOrder.details) {
-        // Has Laravel details - transform it
         console.log('🔄 Order has details, transforming...');
         const transformedOrder = transformOrder(rawOrder);
         
@@ -223,14 +226,13 @@ export function useWebSocket() {
           orderToDispatch = transformedOrder;
         } else {
           console.error('❌ Order transformation failed');
-          return; // Don't update if transform failed
+          return;
         }
       } else {
         console.error('❌ Order has neither items nor details!');
         return;
       }
       
-      // ✨ NEW: Auto-save delivery orders to SQLite when delivered
       if (
         orderToDispatch &&
         orderToDispatch.order_status === 'delivered' &&
@@ -240,9 +242,7 @@ export function useWebSocket() {
         await saveDeliveredOrderToSQLite(orderToDispatch);
       }
       
-      // Dispatch the update
       if (orderToDispatch) {
-        // ✨ Additional safety: If items array is empty, don't update
         if (!orderToDispatch.items || orderToDispatch.items.length === 0) {
           console.warn('⚠️ Order has empty items, skipping WebSocket update');
           console.warn('⚠️ Redux fix will preserve existing items');

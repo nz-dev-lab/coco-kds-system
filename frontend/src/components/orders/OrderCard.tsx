@@ -12,48 +12,49 @@ import { assignDeliveryMan } from '@/store/slices/ordersSlice';
 import { toast } from 'react-hot-toast'; // or your toast library
 import { useOrderBump } from '../../hooks/useOrderBump';
 import { usePrintOrder } from '../../hooks/usePrintOrder';
+import { Order } from '@/types/order.type';
 
-interface Order {
-  id: string;
-  restaurant_id: string;
-  order_status: 'pending' | 'confirmed' | 'processing' | 'handover' | 'picked_up'| 'delivered';
-  order_type: 'delivery' | 'take_away' | 'dine_in';
-  order_age_minutes: number;
-  processing_time?: string | null;
-  items: OrderItem[];
-  order_note?: string | null;
-  delivery_man_id?: string | null;
-  delivery_instruction: string | null;
-  customer_name?: string | null;
-  item_count: number;
-  created_at?: string;
-  schedule_at?: string;
-  is_scheduled: boolean;
-  delivery_address?: any;
-  order_amount?: string;
-  payment_method?: string;
-  bumped_at?: string;        // ← ADD THIS
-  picked_up?: boolean;
-  delivery_charge: string;
-  total_tax_amount: string;
-  coupon_discount_amount?: string;
-  restaurant_discount_amount?: string;
-  dm_tips?: string;
-  additional_charge?: string        // ← ADD THIS (for delivery orders)
+// interface Order {
+//   id: string;
+//   restaurant_id: string;
+//   order_status: 'pending' | 'confirmed' | 'processing' | 'handover' | 'picked_up'| 'delivered';
+//   order_type: 'delivery' | 'take_away' | 'dine_in';
+//   order_age_minutes: number;
+//   processing_time?: string | null;
+//   items: OrderItem[];
+//   order_note?: string | null;
+//   delivery_man_id?: string | null;
+//   delivery_instruction: string | null;
+//   customer_name?: string | null;
+//   item_count: number;
+//   created_at?: string;
+//   schedule_at?: string;
+//   is_scheduled: boolean;
+//   delivery_address?: any;
+//   order_amount?: string;
+//   payment_method?: string;
+//   bumped_at?: string;        // ← ADD THIS
+//   picked_up?: boolean;
+//   delivery_charge: string;
+//   total_tax_amount: string;
+//   coupon_discount_amount?: string;
+//   restaurant_discount_amount?: string;
+//   dm_tips?: string;
+//   additional_charge?: string        // ← ADD THIS (for delivery orders)
   
-}
+// }
 
-interface OrderItem {
-  id: string;
-  food_id: string;
-  name: string;
-  quantity: number;
-  price: string;
-  variant?: string | null;
-  variation: Array<{ type: string; name: string; price: string }>;
-  add_ons: Array<{ name: string; quantity: number; price: string }>;
-  isReady?: boolean;
-}
+// interface OrderItem {
+//   id: string;
+//   food_id: string;
+//   name: string;
+//   quantity: number;
+//   price: string;
+//   variant?: string | null;
+//   variation: Array<{ type: string; name: string; price: string }>;
+//   add_ons: Array<{ name: string; quantity: number; price: string }>;
+//   isReady?: boolean;
+// }
 
 interface OrderCardProps {
   order: Order;

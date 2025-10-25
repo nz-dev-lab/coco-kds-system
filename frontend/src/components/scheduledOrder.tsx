@@ -9,8 +9,6 @@ export default function ScheduledOrderDebug() {
     const now = new Date();
     const scheduledTime = new Date(now.getTime() + minutesFromNow * 60000);
 
-    
-
     const mockOrder = {
       id: `MOCK-${Date.now()}`,
       restaurant_id: '2',
@@ -30,18 +28,23 @@ export default function ScheduledOrderDebug() {
       delivery_address: {
         contact_person_name: 'Test Customer',
         contact_person_number: '+447000000000',
+        contact_person_email: 'test@example.com',
         address_type: 'home',
         address: '123 Test Street',
         longitude: '0',
-        latitude: '0'
+        latitude: '0',
+        floor: null,
+        road: null,
+        house: null,
       },
-      status_timestamps: {
-        pending: now.toISOString(),
-        confirmed: null,
-        processing: null,
-        handover: null,
-        delivered: null
-      },
+      // ✅ ADD THESE REQUIRED FIELDS:
+      delivery_charge: '2.50',
+      total_tax_amount: '1.60',
+      
+      // ❌ REMOVE THIS - not in Order interface:
+      // status_timestamps: { ... }
+      
+      // ✅ FIX ITEMS STRUCTURE:
       items: [
         {
           id: `mock-item-${Date.now()}`,
@@ -50,11 +53,11 @@ export default function ScheduledOrderDebug() {
           quantity: 1,
           price: '15.99',
           variant: null,
-          variations: [],
-          add_ons: []
+          variation: [],  // ← Was "variations" (wrong!)
+          add_ons: [],    // ← Correct
         }
       ],
-      item_count: 1
+      item_count: 1,
     };
 
     dispatch(addOrder(mockOrder));
@@ -62,26 +65,22 @@ export default function ScheduledOrderDebug() {
   };
 
   const testSpeech = () => {
-  console.log('Testing speech synthesis...');
-  console.log('Available:', 'speechSynthesis' in window);
-  
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    
-    const utterance = new SpeechSynthesisUtterance('Testing one two three');
-    utterance.lang = 'en-GB';
-    utterance.volume = 1.0;
-    utterance.rate = 1.0;
-    
-    utterance.onstart = () => console.log('✅ Speech started');
-    utterance.onend = () => console.log('✅ Speech ended');
-    utterance.onerror = (e) => console.error('❌ Speech error:', e);
-    
-    window.speechSynthesis.speak(utterance);
-  } else {
-    console.error('Speech synthesis not supported');
-  }
-};
+    console.log('Testing speech synthesis...');
+    console.log('Available:', 'speechSynthesis' in window);
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance('Testing one two three');
+      utterance.lang = 'en-GB';
+      utterance.volume = 1.0;
+      utterance.rate = 1.0;
+      utterance.onstart = () => console.log('✅ Speech started');
+      utterance.onend = () => console.log('✅ Speech ended');
+      utterance.onerror = (e) => console.error('❌ Speech error:', e);
+      window.speechSynthesis.speak(utterance);
+    } else {
+      console.error('Speech synthesis not supported');
+    }
+  };
 
   if (process.env.NODE_ENV !== 'development') {
     return null;
@@ -90,7 +89,6 @@ export default function ScheduledOrderDebug() {
   return (
     <div className="fixed top-20 right-4 z-50 bg-gray-900 text-white p-4 rounded-lg shadow-xl">
       <h3 className="font-bold mb-3 text-sm">🧪 Scheduled Order Testing</h3>
-      
       <div className="space-y-2">
         <button
           onClick={() => addMockOrder(3, 'Scheduled 3 min')}
@@ -98,9 +96,7 @@ export default function ScheduledOrderDebug() {
         >
           Add Mock Order (3 min)
         </button>
-
         <hr className="border-gray-700" />
-
         <p className="text-xs text-gray-400 mb-1">Test Audio:</p>
         <button
           onClick={() => audioNotificationService.playReadyNotification('TEST')}
@@ -115,11 +111,11 @@ export default function ScheduledOrderDebug() {
           🚨 Overdue Alarm
         </button>
         <button
-  onClick={testSpeech}
-  className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-xs"
->
-  🗣️ Test Speech
-</button>
+          onClick={testSpeech}
+          className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-xs"
+        >
+          🗣️ Test Speech
+        </button>
       </div>
     </div>
   );

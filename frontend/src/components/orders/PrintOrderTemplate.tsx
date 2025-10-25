@@ -1,5 +1,5 @@
 import React from 'react';
-import { Order } from '../../store/slices/ordersSlice';
+import { Order } from '@/types/order.type';
 
 interface PrintOrderTemplateProps {
   order: Order;

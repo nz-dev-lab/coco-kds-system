@@ -1,18 +1,18 @@
 // src/pages/Dispatch.tsx
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchOrders } from '../store/slices/ordersSlice';
 import { Truck, Package, Clock, User, Phone, MapPin, RefreshCw } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useLiveClock } from '../hooks/useLiveClock';
 import DeliveryDetailsModal from '../components/orders/DeliveryDetailsModal';
-import { useState } from 'react';
+import { Order } from '@/types/order.type'; 
 
 export default function Dispatch() {
   const dispatch = useAppDispatch();
   const { orders, loading, error } = useAppSelector((state) => state.orders);
   const currentTime = useLiveClock();
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useWebSocket();
 
@@ -29,8 +29,8 @@ export default function Dispatch() {
 
   // Sort by pickup time (oldest first - by created_at)
   const sortedOrders = [...dispatchOrders].sort((a, b) => {
-    const timeA = new Date(a.created_at).getTime();
-    const timeB = new Date(b.created_at).getTime();
+    const timeA = new Date(a.created_at || Date.now()).getTime();  // ✅ FIXED
+    const timeB = new Date(b.created_at || Date.now()).getTime();  // ✅ FIXED
     return timeA - timeB; // Oldest first
   });
 

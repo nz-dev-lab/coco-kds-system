@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Order } from '../store/slices/ordersSlice';
+import { Order } from '@/types/order.type'; 
 import { PrintOrderTemplate } from '../components/orders/PrintOrderTemplate';
 import { toast } from 'react-toastify'; // Assuming you use react-toastify
 
@@ -67,7 +67,7 @@ export const usePrintOrder = () => {
           <html>
             <head>
               <meta charSet="utf-8" />
-              <title>Order #{order.id}</title>
+              <title>{`Order #${order.id}`}</title>
               <style>{`
                 * { margin: 0; padding: 0; box-sizing: border-box; }
                 body { margin: 0; padding: 0; }

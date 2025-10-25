@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Dispatch from './pages/Dispatch';
+import { ToastContainer } from 'react-toastify';  // ✅ ADD THIS
+import 'react-toastify/dist/ReactToastify.css';
 
 // Temporary placeholder components
 const OrdersPage = () => (
@@ -37,37 +39,53 @@ function App() {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
 
   return (
-    <HashRouter> {/* ⭐ Changed BrowserRouter to HashRouter */}
-      <Routes>
-        {/* Public Route: Login */}
-        <Route
-          path="/login"
-          element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
-          }
-        />
-
-        {/* Protected Routes: All others wrapped in MainLayout */}
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/orders" element={<OrdersPage />} />
-                  <Route path="/dispatch" element={<Dispatch />} />
-                  <Route path="/history" element={<HistoryPage />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </HashRouter>
+    <>
+      <HashRouter>
+        <Routes>
+          {/* Public Route: Login */}
+          <Route
+            path="/login"
+            element={
+              isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
+            }
+          />
+          
+          {/* Protected Routes: All others wrapped in MainLayout */}
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/orders" element={<OrdersPage />} />
+                    <Route path="/dispatch" element={<Dispatch />} />
+                    <Route path="/history" element={<HistoryPage />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  </Routes>
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </HashRouter>
+      
+      {/* ✅ ADD THIS - Toast Notification Container */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
+    </>
   );
 }
 
