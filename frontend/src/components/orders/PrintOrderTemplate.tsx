@@ -7,7 +7,7 @@ interface PrintOrderTemplateProps {
 
 /**
  * Print template optimized for 80mm thermal printers
- * Can also work with regular printers
+ * Matches Laravel receipt calculation exactly
  */
 export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order }) => {
   const formatDateTime = (date: string) => {
@@ -32,6 +32,35 @@ export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order })
         return type.toUpperCase();
     }
   };
+
+  // ✅ CORRECT CALCULATION: Reverse calculate items subtotal
+  const calculateItemsSubtotal = () => {
+    const orderAmount = parseFloat(order.order_amount || '0');
+    const deliveryCharge = parseFloat(order.delivery_charge || '0');
+    const dmTips = parseFloat(order.dm_tips || '0');
+    const additionalCharge = parseFloat(order.additional_charge || '0');
+    const extraPackaging = parseFloat(order.extra_packaging_amount || '0');
+    const couponDiscount = parseFloat(order.coupon_discount_amount || '0');
+    const restaurantDiscount = parseFloat(order.restaurant_discount_amount || '0');
+
+    // Formula: items = order_amount - delivery - tips - extras + discounts
+    const itemsTotal = 
+      orderAmount 
+      - deliveryCharge 
+      - dmTips 
+      - additionalCharge 
+      - extraPackaging 
+      + couponDiscount 
+      + restaurantDiscount;
+
+    return itemsTotal;
+  };
+
+  const itemsSubtotal = calculateItemsSubtotal();
+  const totalTax = parseFloat(order.total_tax_amount || '0');
+  const totalDiscount = 
+    parseFloat(order.coupon_discount_amount || '0') + 
+    parseFloat(order.restaurant_discount_amount || '0');
 
   return (
     <div
@@ -64,7 +93,7 @@ export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order })
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
           <strong>Time:</strong>
-          <span>{formatDateTime(order.created_at || 'Date')}</span>
+          <span>{formatDateTime(order.created_at || new Date().toISOString())}</span>
         </div>
 
         {order.schedule_at && (
@@ -97,15 +126,18 @@ export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order })
         
         {order.items?.map((item, index) => (
           <div key={index} style={{ marginBottom: '15px' }}>
-            {/* Item name and quantity */}
+            {/* Item name, quantity, and total price */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
               <div style={{ flex: 1 }}>
                 <strong style={{ fontSize: '13px' }}>
                   {item.quantity}x {item.name || 'Unknown Item'}
                 </strong>
+                <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
+                  @ £{parseFloat(item.price).toFixed(2)} each
+                </div>
               </div>
               <div style={{ fontWeight: 'bold' }}>
-                £{parseFloat(item.price).toFixed(2)}
+                £{(parseFloat(item.price) * item.quantity).toFixed(2)}
               </div>
             </div>
 
@@ -145,34 +177,95 @@ export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order })
         </div>
       )}
 
-      {/* Total */}
+      {/* ✅ CORRECTED TOTAL CALCULATION */}
       <div style={{ borderTop: '2px solid #000', paddingTop: '10px', marginTop: '10px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-          <strong>Subtotal:</strong>
-          <span>£{parseFloat(order.order_amount || '0').toFixed(2)}</span>
+        {/* Items Total */}
+        <div style={{ marginBottom: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+            <strong>Items Total:</strong>
+            <span style={{ fontWeight: 'bold' }}>£{itemsSubtotal.toFixed(2)}</span>
+          </div>
+          {/* Tax info (informational only - NOT added to total) */}
+          {totalTax > 0 && (
+            <div style={{ fontSize: '10px', color: '#666', marginLeft: '10px' }}>
+              (Tax £{totalTax.toFixed(2)} included)
+            </div>
+          )}
         </div>
 
-        {parseFloat(order.total_tax_amount) > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-            <strong>Tax:</strong>
-            <span>£{parseFloat(order.total_tax_amount).toFixed(2)}</span>
+        {/* Add-ons Total (if any) */}
+        {order.items?.some(item => item.add_ons && item.add_ons.length > 0) && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '11px' }}>
+            <span>Addon Cost:</span>
+            <span>
+              £{order.items.reduce((total, item) => {
+                const addonsTotal = item.add_ons?.reduce((sum, addon) => 
+                  sum + (parseFloat(addon.price) * addon.quantity), 0) || 0;
+                return total + addonsTotal;
+              }, 0).toFixed(2)}
+            </span>
           </div>
         )}
 
-        {parseFloat(order.delivery_charge) > 0 && (
+        {/* Discounts */}
+        {parseFloat(order.restaurant_discount_amount || '0') > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', color: '#d9534f' }}>
+            <strong>Restaurant Discount:</strong>
+            <span style={{ fontWeight: 'bold' }}>-£{parseFloat(order.restaurant_discount_amount || '0').toFixed(2)}</span>
+          </div>
+        )}
+
+        {parseFloat(order.coupon_discount_amount || '0') > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', color: '#d9534f' }}>
+            <strong>Coupon Discount:</strong>
+            <span style={{ fontWeight: 'bold' }}>-£{parseFloat(order.coupon_discount_amount || '0').toFixed(2)}</span>
+          </div>
+        )}
+
+        {/* Delivery Charge */}
+        {parseFloat(order.delivery_charge || '0') > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-            <strong>Delivery:</strong>
+            <strong>Delivery Charge:</strong>
             <span>£{parseFloat(order.delivery_charge).toFixed(2)}</span>
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'bold', marginTop: '10px', paddingTop: '10px', borderTop: '2px solid #000' }}>
+        {/* DM Tips */}
+        {parseFloat(order.dm_tips || '0') > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+            <strong>Delivery Tips:</strong>
+            <span>£{parseFloat(order.dm_tips || '0').toFixed(2)}</span>
+          </div>
+        )}
+
+        {/* Additional Charge */}
+        {parseFloat(order.additional_charge || '0') > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+            <strong>Service Charge:</strong>
+            <span>£{parseFloat(order.additional_charge || '0').toFixed(2)}</span>
+          </div>
+        )}
+
+        {/* Extra Packaging */}
+        {parseFloat(order.extra_packaging_amount || '0') > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+            <strong>Extra Packaging:</strong>
+            <span>£{parseFloat(order.extra_packaging_amount || '0').toFixed(2)}</span>
+          </div>
+        )}
+
+        {/* Final Total */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          fontSize: '16px', 
+          fontWeight: 'bold', 
+          marginTop: '10px', 
+          paddingTop: '10px', 
+          borderTop: '2px solid #000' 
+        }}>
           <span>TOTAL:</span>
-          <span>£{(
-            parseFloat(order.order_amount || '0') +
-            parseFloat(order.total_tax_amount) +
-            parseFloat(order.delivery_charge)
-          ).toFixed(2)}</span>
+          <span>£{parseFloat(order.order_amount || '0').toFixed(2)}</span>
         </div>
 
         {/* Payment Status */}

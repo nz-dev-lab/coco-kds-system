@@ -48,6 +48,7 @@ const navigationItems: NavItem[] = [
 export default function Sidebar() {
   const dispatch = useAppDispatch();
   const sidebarOpen = useAppSelector((state) => state.ui.sidebarOpen);
+  const version = import.meta.env.VITE_APP_VERSION || '0.0.0';
 
   const handleToggle = () => {
     dispatch(toggleSidebar());
@@ -98,7 +99,7 @@ export default function Sidebar() {
             <div className="text-xs text-slate-500 dark:text-kds-text-muted">
               <div className="flex justify-between mb-1">
                 <span>Version</span>
-                <span className="font-mono text-slate-700 dark:text-kds-text-secondary">v1.0.2</span>
+                <span className="font-mono text-slate-700 dark:text-kds-text-secondary">{version}</span>
               </div>
               <div className="flex justify-between">
                 <span>Status</span>
@@ -106,6 +107,10 @@ export default function Sidebar() {
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   <span className="text-green-600 dark:text-green-400">Online</span>
                 </span>
+              </div>
+              <div className="flex justify-between mt-1">
+                <span>Powered By</span>
+                <span className="font-mono text-md text-slate-700 dark:text-kds-text-secondary">NM</span>
               </div>
             </div>
           </div>

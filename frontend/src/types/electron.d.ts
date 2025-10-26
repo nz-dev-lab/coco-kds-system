@@ -20,9 +20,13 @@ export interface ElectronAPI {
   closeWindow: () => void;
   toggleFullscreen: () => void;
   isMaximized: () => Promise<boolean>;
-  onUpdateAvailable: (callback: (info: any) => void) => void;
-  onDownloadProgress: (callback: (progress: any) => void) => void;
-  onUpdateDownloaded: (callback: (info: any) => void) => void;
+  autoUpdater: {
+        onUpdateAvailable: (callback: (info: any) => void) => void;
+        onUpdateProgress: (callback: (progress: any) => void) => void;
+        onUpdateDownloaded: (callback: (info: any) => void) => void;
+        downloadUpdate: () => void;
+        installUpdate: () => void;
+  };
   
   // Database API
   database: {

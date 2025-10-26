@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Dispatch from './pages/Dispatch';
 import { ToastContainer } from 'react-toastify';  // ✅ ADD THIS
 import 'react-toastify/dist/ReactToastify.css';
+import UpdateManager from './components/UpdateManager';
 
 // Temporary placeholder components
 const OrdersPage = () => (
@@ -40,6 +41,7 @@ function App() {
 
   return (
     <>
+    <UpdateManager />
       <HashRouter>
         <Routes>
           {/* Public Route: Login */}

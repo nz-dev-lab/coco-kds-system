@@ -1,6 +1,8 @@
+@import './styles/animations.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 
 @layer base {
   body {
@@ -39,6 +41,31 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+  }
+
+  /* Webkit browsers (Chrome, Safari, Edge) */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1; /* slate-300 */
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8; /* slate-400 */
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
   }
 }
 

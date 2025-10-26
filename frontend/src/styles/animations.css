@@ -1,0 +1,60 @@
+/* New Order Attention Animation - Glow + Subtle Pulse */
+@keyframes newOrderAttention {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.6),
+                0 0 30px rgba(59, 130, 246, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(59, 130, 246, 0.9),
+                0 0 50px rgba(59, 130, 246, 0.5);
+    transform: scale(1.01);
+  }
+}
+
+.new-order-animation {
+  animation: newOrderAttention 2s ease-in-out infinite;
+  border: 2px solid #3B82F6 !important;
+  position: relative;
+}
+
+/* Optional: Add a badge indicator */
+.new-order-animation::before {
+  content: 'NEW';
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: #EF4444;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 12px;
+  z-index: 10;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+/* Fade out animation when stopping */
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.animation-fade-out {
+  animation: fadeOut 0.5s ease-out forwards;
+}

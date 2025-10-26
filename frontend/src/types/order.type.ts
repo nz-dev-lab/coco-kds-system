@@ -10,6 +10,7 @@ export interface Order {
   order_amount: string;
   delivery_charge: string;
   total_tax_amount: string;
+  extra_packaging_amount?: string;
   
   // Optional financial
   coupon_discount_amount?: string;

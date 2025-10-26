@@ -83,6 +83,78 @@ export const usePrintOrder = () => {
           </html>
         );
 
+
+      // ✅ ADD THIS: Log the receipt calculation
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📄 RECEIPT CALCULATION FOR ORDER #' + order.id);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      // Calculate items subtotal (same logic as template)
+      const orderAmount = parseFloat(order.order_amount || '0');
+      const deliveryCharge = parseFloat(order.delivery_charge || '0');
+      const dmTips = parseFloat(order.dm_tips || '0');
+      const additionalCharge = parseFloat(order.additional_charge || '0');
+      const extraPackaging = parseFloat(order.extra_packaging_amount || '0');
+      const couponDiscount = parseFloat(order.coupon_discount_amount || '0');
+      const restaurantDiscount = parseFloat(order.restaurant_discount_amount || '0');
+      
+      const itemsSubtotal = 
+        orderAmount 
+        - deliveryCharge 
+        - dmTips 
+        - additionalCharge 
+        - extraPackaging 
+        + couponDiscount 
+        + restaurantDiscount;
+      
+      console.log('Raw Data:');
+      console.log('  order_amount:', orderAmount);
+      console.log('  delivery_charge:', deliveryCharge);
+      console.log('  dm_tips:', dmTips);
+      console.log('  additional_charge:', additionalCharge);
+      console.log('  extra_packaging_amount:', extraPackaging);
+      console.log('  coupon_discount_amount:', couponDiscount);
+      console.log('  restaurant_discount_amount:', restaurantDiscount);
+      console.log('  total_tax_amount:', order.total_tax_amount);
+      console.log('');
+      console.log('Calculated Breakdown:');
+      console.log('  Items Subtotal: £' + itemsSubtotal.toFixed(2));
+      console.log('  Tax (included): £' + parseFloat(order.total_tax_amount || '0').toFixed(2));
+      
+      if (restaurantDiscount > 0) {
+        console.log('  Restaurant Discount: -£' + restaurantDiscount.toFixed(2));
+      }
+      if (couponDiscount > 0) {
+        console.log('  Coupon Discount: -£' + couponDiscount.toFixed(2));
+      }
+      if (deliveryCharge > 0) {
+        console.log('  Delivery Charge: +£' + deliveryCharge.toFixed(2));
+      }
+      if (dmTips > 0) {
+        console.log('  DM Tips: +£' + dmTips.toFixed(2));
+      }
+      if (additionalCharge > 0) {
+        console.log('  Service Charge: +£' + additionalCharge.toFixed(2));
+      }
+      if (extraPackaging > 0) {
+        console.log('  Extra Packaging: +£' + extraPackaging.toFixed(2));
+      }
+      
+      console.log('  ─────────────────────────────────');
+      console.log('  TOTAL: £' + orderAmount.toFixed(2));
+      console.log('');
+      console.log('Verification:');
+      const recalculated = itemsSubtotal - restaurantDiscount - couponDiscount + deliveryCharge + dmTips + additionalCharge + extraPackaging;
+      console.log('  Recalculated Total: £' + recalculated.toFixed(2));
+      console.log('  Matches order_amount: ' + (Math.abs(recalculated - orderAmount) < 0.01 ? '✅ YES' : '❌ NO'));
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('');
+
+      // ✅ ADD THIS: Log a preview of the receipt HTML (first 1000 chars)
+      console.log('📄 Receipt HTML Preview (first 1000 chars):');
+      console.log(printHtml.substring(0, 1000) + '...');
+      console.log('');
+
         // Send to printer
         const result = await window.electron.printer.printOrder(
           printHtml,

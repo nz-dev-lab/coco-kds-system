@@ -165,11 +165,16 @@ function setupAutoUpdater(window: BrowserWindow) {
     console.log('🔍 Checking for updates...');
   });
 
-  autoUpdater.on('update-available', (info) => {
-    console.log('✅ Update available:', info.version);
-    window.webContents.send('update_available', info);
-    autoUpdater.downloadUpdate();
+autoUpdater.on('update-available', (info) => {
+  console.log('✅ Update available:', info.version);
+  // Send to renderer - let user decide
+  window.webContents.send('update_available', {
+    version: info.version,
+    releaseNotes: info.releaseNotes,
+    releaseDate: info.releaseDate,
   });
+  // DON'T auto-download - wait for user confirmation
+});
 
   autoUpdater.on('update-not-available', (info) => {
     console.log('✓ App is up to date:', info.version);
@@ -270,6 +275,19 @@ ipcMain.handle('db:get-total-count', async (event, restaurantId: string) => {
     console.error('❌ Failed to get count:', error);
     return { success: false, error: error.message };
   }
+});
+
+// Add handler for user-initiated download
+ipcMain.on('download-update', () => {
+  console.log('📥 User initiated update download');
+  autoUpdater.downloadUpdate();
+});
+
+// Add handler for user-initiated install
+ipcMain.on('install-update', () => {
+  console.log('🔄 Installing update and restarting...');
+  autoUpdater.quitAndInstall(false, true);
+  // false = don't force, true = restart after install
 });
 
 ipcMain.handle('get-printers', async () => {

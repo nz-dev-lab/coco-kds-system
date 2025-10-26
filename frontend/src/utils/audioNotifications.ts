@@ -8,19 +8,23 @@ class AudioNotificationService {
   // Sound effects
   private chimeReady: HTMLAudioElement;
   private alarmOverdue: HTMLAudioElement;
+  private newOrderSound: HTMLAudioElement;  // ✅ ADD
   
   // Voice files
   private voiceReady: HTMLAudioElement;
   private voiceOverdue: HTMLAudioElement;
+  private newOrderVoice: HTMLAudioElement;  // ✅ ADD
 
   constructor() {
     // Load sound effects
-      this.chimeReady = new Audio('./sounds/chime-ready.mp3');       // ✅ FIXED
-  this.alarmOverdue = new Audio('./sounds/alarm-overdue.mp3');   // ✅ FIXED
+    this.chimeReady = new Audio('./sounds/chime-ready.mp3');
+    this.alarmOverdue = new Audio('./sounds/alarm-overdue.mp3');
+    this.newOrderSound = new Audio('./sounds/new_order.mp3');  // ✅ ADD
   
-  // Load voice files
-  this.voiceReady = new Audio('./sounds/ready-voice.mp3');       // ✅ FIXED
-  this.voiceOverdue = new Audio('./sounds/overdue-voice.mp3'); 
+    // Load voice files
+    this.voiceReady = new Audio('./sounds/ready-voice.mp3');
+    this.voiceOverdue = new Audio('./sounds/overdue-voice.mp3');
+    this.newOrderVoice = new Audio('./sounds/new_order_voice.mp3');  // ✅ ADD
     
     // Volumes will be set dynamically based on settings
     this.updateVolumes();
@@ -30,6 +34,8 @@ class AudioNotificationService {
     this.alarmOverdue.load();
     this.voiceReady.load();
     this.voiceOverdue.load();
+    this.newOrderSound.load();  // ✅ ADD
+    this.newOrderVoice.load();  // ✅ ADD
     
     console.log('✅ Audio notification system initialized');
     
@@ -38,6 +44,8 @@ class AudioNotificationService {
     this.alarmOverdue.onerror = () => console.error('❌ Failed to load alarm-overdue.mp3');
     this.voiceReady.onerror = () => console.error('❌ Failed to load ready-voice.mp3');
     this.voiceOverdue.onerror = () => console.error('❌ Failed to load overdue-voice.mp3');
+    this.newOrderSound.onerror = () => console.error('❌ Failed to load new_order.mp3');  // ✅ ADD
+    this.newOrderVoice.onerror = () => console.error('❌ Failed to load new_order_voice.mp3');  // ✅ ADD
   }
 
   // Update volumes based on Redux settings
@@ -47,8 +55,10 @@ class AudioNotificationService {
     // Convert 0-100 to 0-1
     this.chimeReady.volume = settings.soundEffectsVolume / 100;
     this.alarmOverdue.volume = settings.soundEffectsVolume / 100;
+    this.newOrderSound.volume = settings.soundEffectsVolume / 100;  // ✅ ADD
     this.voiceReady.volume = settings.voiceVolume / 100;
     this.voiceOverdue.volume = settings.voiceVolume / 100;
+    this.newOrderVoice.volume = settings.voiceVolume / 100;  // ✅ ADD
   }
 
   // Check if audio is enabled
@@ -128,6 +138,38 @@ class AudioNotificationService {
     }
   }
 
+  // ✅ ADD THIS - New order notification
+  async playNewOrderNotification() {
+    // Check if notifications are disabled
+    if (!this.isEnabled()) {
+      console.log('🔇 Audio notifications disabled');
+      return;
+    }
+
+    console.log('🔔 Playing NEW ORDER notification');
+
+    // Update volumes before playing
+    this.updateVolumes();
+
+    try {
+      // Step 1: Play new order sound
+      this.newOrderSound.currentTime = 0;
+      await this.newOrderSound.play();
+
+      // Step 2: Wait for sound to finish, then play voice (if enabled)
+      this.newOrderSound.onended = () => {
+        if (this.isVoiceEnabled()) {
+          this.newOrderVoice.currentTime = 0;
+          this.newOrderVoice.play().catch(e => console.error('Voice play error:', e));
+        } else {
+          console.log('🔇 Voice notifications disabled');
+        }
+      };
+    } catch (error) {
+      console.error('❌ Audio play error:', error);
+    }
+  }
+
   // Test sounds (used in settings page)
   async testReadySound() {
     this.updateVolumes();
@@ -151,6 +193,20 @@ class AudioNotificationService {
     this.updateVolumes();
     this.voiceOverdue.currentTime = 0;
     await this.voiceOverdue.play();
+  }
+
+  // ✅ ADD THIS - Test new order sound
+  async testNewOrderSound() {
+    this.updateVolumes();
+    this.newOrderSound.currentTime = 0;
+    await this.newOrderSound.play();
+  }
+
+  // ✅ ADD THIS - Test new order voice
+  async testNewOrderVoice() {
+    this.updateVolumes();
+    this.newOrderVoice.currentTime = 0;
+    await this.newOrderVoice.play();
   }
 
   resetOrderNotification(orderId: string) {

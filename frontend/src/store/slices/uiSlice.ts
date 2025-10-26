@@ -17,6 +17,7 @@ interface UIState {
       showOrderAge: boolean;
       autoRefresh: boolean;
     };
+    requireDoubleTap: boolean;
   };
 }
 
@@ -43,6 +44,7 @@ const loadSettings = (): UIState['settings'] => {
       showOrderAge: true,
       autoRefresh: true,
     },
+    requireDoubleTap: true,
   };
 };
 
@@ -112,6 +114,11 @@ const uiSlice = createSlice({
       state.settings.display.autoRefresh = !state.settings.display.autoRefresh;
       localStorage.setItem('kds-settings', JSON.stringify(state.settings));
     },
+
+    toggleRequireDoubleTap(state) {
+      state.settings.requireDoubleTap = !state.settings.requireDoubleTap;
+      localStorage.setItem('kds-settings', JSON.stringify(state.settings));
+    },
     
     // Reset to defaults
     resetSettings: (state) => {
@@ -126,6 +133,7 @@ const uiSlice = createSlice({
           showOrderAge: true,
           autoRefresh: true,
         },
+        requireDoubleTap: true,
       };
       localStorage.setItem('kds-settings', JSON.stringify(state.settings));
     },
@@ -146,6 +154,7 @@ export const {
   setVoiceVolume,
   toggleShowOrderAge,
   toggleAutoRefresh,
+  toggleRequireDoubleTap,
   resetSettings,
 } = uiSlice.actions;
 

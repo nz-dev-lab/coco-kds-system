@@ -7,6 +7,7 @@ import {
   setSoundEffectsVolume,
   setVoiceVolume,
   resetSettings,
+  toggleRequireDoubleTap,
 } from '../store/slices/uiSlice';
 import { audioNotificationService } from '../utils/audioNotifications';
 
@@ -33,6 +34,15 @@ export default function Settings() {
     }
   };
 
+  const handleTestNewOrder = async () => {
+  await audioNotificationService.testNewOrderSound();
+  if (settings.audioNotifications.voiceEnabled) {
+    setTimeout(() => {
+      audioNotificationService.testNewOrderVoice();
+    }, 500);
+  }
+};
+
   const handleReset = () => {
     if (confirm('Reset all settings to default values?')) {
       dispatch(resetSettings());
@@ -41,7 +51,7 @@ export default function Settings() {
 
   return (
     <div className="p-6 max-w-4xl">
-      <h1 className="text-3xl font-bold text-slate-800 mb-6">Settings</h1>
+      <h1 className="text-3xl font-bold text-slate-900 dark:text-kds-text-primary mb-6">Settings</h1>
 
       {/* Audio Notifications Section */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -153,28 +163,61 @@ export default function Settings() {
         </div>
 
         {/* Test Buttons */}
-        <div className="pt-4">
-          <p className="text-sm text-slate-600 mb-3">Test Audio Notifications:</p>
-          <div className="flex gap-3">
-            <button
-              onClick={handleTestReady}
-              disabled={!settings.audioNotifications.enabled}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
-            >
-              <Play className="w-4 h-4" />
-              Test "Ready" Sound
-            </button>
-            <button
-              onClick={handleTestOverdue}
-              disabled={!settings.audioNotifications.enabled}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
-            >
-              <Play className="w-4 h-4" />
-              Test "Overdue" Alarm
-            </button>
+<div className="pt-4">
+  <p className="text-sm text-slate-600 mb-3">Test Audio Notifications:</p>
+  <div className="flex flex-wrap gap-3">
+    <button
+      onClick={handleTestNewOrder}  // ✅ NEW
+      disabled={!settings.audioNotifications.enabled}
+      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+    >
+      <Play className="w-4 h-4" />
+      Test "New Order" Sound
+    </button>
+    <button
+      onClick={handleTestReady}
+      disabled={!settings.audioNotifications.enabled}
+      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+    >
+      <Play className="w-4 h-4" />
+      Test "Ready" Sound
+    </button>
+    <button
+      onClick={handleTestOverdue}
+      disabled={!settings.audioNotifications.enabled}
+      className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+    >
+      <Play className="w-4 h-4" />
+      Test "Overdue" Alarm
+    </button>
+  </div>
+</div>
+      </div>
+
+      {/* Interaction Settings */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold text-slate-800 mb-4">Interaction</h2>
+
+        <div className="flex items-center justify-between py-3 border-b">
+          <div>
+            <p className="font-medium text-slate-800">Require double-tap to confirm actions</p>
+            <p className="text-sm text-slate-500">When enabled, action buttons require a double-click / double-tap</p>
           </div>
+          <button
+            onClick={() => dispatch(toggleRequireDoubleTap())}
+            className={`relative w-14 h-7 rounded-full transition-colors ${
+              settings.requireDoubleTap ? 'bg-green-500' : 'bg-slate-300'
+            }`}
+          >
+            <span
+              className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
+                settings.requireDoubleTap ? 'translate-x-7' : 'translate-x-0'
+              }`}
+            />
+          </button>
         </div>
       </div>
+
 
       {/* Display Settings Section */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">

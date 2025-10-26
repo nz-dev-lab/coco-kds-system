@@ -4,6 +4,8 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addOrder, updateOrder } from '../store/slices/ordersSlice';
 import { io, Socket } from 'socket.io-client';
 import { Order } from '@/types/order.type';
+import { audioNotificationService } from '../utils/audioNotifications';  // ✅ ADD THIS
+
 
 export function useWebSocket() {
   const dispatch = useAppDispatch();
@@ -197,6 +199,9 @@ export function useWebSocket() {
       if (transformedOrder && transformedOrder.items && transformedOrder.items.length > 0) {
         console.log('✅ Order transformed successfully:', transformedOrder);
         dispatch(addOrder(transformedOrder));
+        
+        // ✅ ADD THIS - Play notification for new orders
+        audioNotificationService.playNewOrderNotification();
       } else {
         console.error('❌ Order transformation failed or no items:', rawOrder);
       }

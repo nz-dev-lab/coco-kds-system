@@ -28,13 +28,19 @@ contextBridge.exposeInMainWorld('electron', {
     return ipcRenderer.invoke(channel, ...args);
   },
 
-  // Auto-update specific
-  onUpdateAvailable: (callback: () => void) => {
-    ipcRenderer.on('update_available', callback);
-  },
-  
-  onUpdateDownloaded: (callback: () => void) => {
-    ipcRenderer.on('update_downloaded', callback);
+ // Auto-update specific (REPLACE existing ones)
+  autoUpdater: {
+    onUpdateAvailable: (callback: (info: any) => void) => {
+      ipcRenderer.on('update_available', (event, info) => callback(info));
+    },
+    onUpdateProgress: (callback: (progress: any) => void) => {
+      ipcRenderer.on('update_progress', (event, progress) => callback(progress));
+    },
+    onUpdateDownloaded: (callback: (info: any) => void) => {
+      ipcRenderer.on('update_downloaded', (event, info) => callback(info));
+    },
+    downloadUpdate: () => ipcRenderer.send('download-update'),
+    installUpdate: () => ipcRenderer.send('install-update'),
   },
 
   // DATABASE API

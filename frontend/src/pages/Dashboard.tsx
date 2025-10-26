@@ -5,7 +5,7 @@ import { fetchOrders } from '../store/slices/ordersSlice';
 import OrderCard from '../components/orders/OrderCard';
 import { RefreshCw, Clock } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { useLiveClock } from '../hooks/useLiveClock'; // NEW: Live clock hook
+import { useLiveClock } from '../hooks/useLiveClock';
 
 export default function Dashboard() {
   const dispatch = useAppDispatch();
@@ -31,14 +31,14 @@ export default function Dashboard() {
 
   // Filter out delivered orders
   const activeOrders = orders.filter((order) => {
-  // Exclude delivered orders
-  if (order.order_status === 'delivered') return false;
-  
-  // Exclude picked_up orders (they go to Dispatch page)
-  if (order.order_status === 'picked_up') return false;
-  
-  return true;
-});
+    // Exclude delivered orders
+    if (order.order_status === 'delivered') return false;
+    
+    // Exclude picked_up orders (they go to Dispatch page)
+    if (order.order_status === 'picked_up') return false;
+    
+    return true;
+  });
 
   // Sort orders by status priority first, then by creation time (newest first)
   const statusPriority: Record<string, number> = {
@@ -58,7 +58,6 @@ export default function Dashboard() {
     }
     
     // Same status, sort by creation time (newest first)
-    // Use a safe fallback (0) when created_at may be undefined so Date() call is always valid.
     const timeA = new Date(a.created_at ?? 0).getTime();
     const timeB = new Date(b.created_at ?? 0).getTime();
     
@@ -154,7 +153,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Orders Grid */}
+      {/* Orders Grid - ✅ FIXED WITH RESPONSIVE COLUMNS */}
       <div className="flex-1 overflow-auto p-6">
         {sortedOrders.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -168,11 +167,15 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max ${
-  sidebarOpen 
-    ? 'xl:grid-cols-3 2xl:grid-cols-4'
-    : 'xl:grid-cols-4 2xl:grid-cols-5'
-}`}>
+          <div className={`
+            grid gap-4 auto-rows-max
+            grid-cols-1
+            sm:grid-cols-2
+            ${sidebarOpen 
+              ? 'lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
+              : 'lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+            }
+          `}>
             {sortedOrders.map((order) => (
               <OrderCard key={order.id} order={order} />
             ))}

@@ -3,65 +3,12 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { Order } from '@/types/order.type';
 
-// export interface DeliveryAddress {
-//   contact_person_name: string;
-//   contact_person_number: string;
-//   contact_person_email?: string;
-//   address_type: string;
-//   address: string;
-//   floor?: string | null;
-//   road?: string | null;
-//   house?: string | null;
-//   longitude: string;
-//   latitude: string;
-// }
-
-// export interface OrderItem {
-//   id: string;
-//   food_id: string;
-//   name: string;
-//   quantity: number;
-//   price: string;
-//   variant?: string | null;
-//   variation: Array<{ type: string; name: string; price: string }>;
-//   add_ons: Array<{ name: string; quantity: number; price: string }>;
-//   isReady?: boolean; // Frontend only
-// }
-
-// export interface Order {
-//   id: string;
-//   restaurant_id: string;
-//   order_status: 'pending' | 'confirmed' | 'processing' | 'handover' |'picked_up' | 'delivered';
-//   order_type: 'delivery' | 'take_away' | 'dine_in';
-//   payment_method?: string;
-//   order_amount?: string;
-//   processing_time?: string | null;
-//   order_note?: string | null;
-//   delivery_instruction: string | null;
-//   delivery_man_id?: string | null;
-//   created_at?: string;
-//   schedule_at?: string;
-//   order_age_minutes: number;
-//   is_scheduled: boolean;
-//   items: OrderItem[];
-//   item_count: number;
-//   customer_name?: string | null;
-//   delivery_address?: DeliveryAddress | null;
-//   bumped_at?: string;        // When order was bumped
-//   picked_up?: boolean;        // For delivery orders (picked up by delivery man)
-//   delivery_charge: string;
-//   total_tax_amount: string;
-//   coupon_discount_amount?: string;
-//   restaurant_discount_amount?: string;
-//   dm_tips?: string;
-//   additional_charge?: string
-// }
-
 interface OrdersState {
   orders: Order[];
   loading: boolean;
   error: string | null;
   lastFetch: number | null;
+  newOrderIds: string[];  // ✅ Already added
 }
 
 const initialState: OrdersState = {
@@ -69,6 +16,7 @@ const initialState: OrdersState = {
   loading: false,
   error: null,
   lastFetch: null,
+  newOrderIds: [],  // ✅ Already added
 };
 
 // Fetch orders
@@ -178,7 +126,12 @@ const ordersSlice = createSlice({
   initialState,
   reducers: {
     addOrder: (state, action: PayloadAction<Order>) => {
-      state.orders.unshift(action.payload);
+      // ✅ MODIFIED: Check if order already exists
+      const exists = state.orders.some(o => o.id === action.payload.id);
+      if (!exists) {
+        state.orders.unshift(action.payload);
+        state.newOrderIds.push(action.payload.id);  // ✅ ADD: Mark as new
+      }
     },
     updateOrder: (state, action: PayloadAction<Order>) => {
       const index = state.orders.findIndex((o) => o.id === action.payload.id);
@@ -195,6 +148,9 @@ const ordersSlice = createSlice({
         }
       }
     },
+    markOrderAsViewed: (state, action: PayloadAction<string>) => {
+      state.newOrderIds = state.newOrderIds.filter(id => id !== action.payload);
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -207,6 +163,8 @@ const ordersSlice = createSlice({
         state.loading = false;
         state.orders = action.payload;
         state.lastFetch = Date.now();
+        // ✅ IMPORTANT: Don't mark fetched orders as new (they already existed)
+        // Only WebSocket 'order:new' events should add to newOrderIds
       })
       .addCase(fetchOrders.rejected, (state, action) => {
         state.loading = false;
@@ -324,6 +282,9 @@ const ordersSlice = createSlice({
           state.orders = state.orders.filter(o => o.id !== orderId);
         }
         
+        // ✅ ADD: Remove from new orders list when bumped
+        state.newOrderIds = state.newOrderIds.filter(id => id !== orderId);
+        
         console.log('✅ Order bumped successfully');
       })
       .addCase(bumpOrder.rejected, (state, action) => {
@@ -333,5 +294,11 @@ const ordersSlice = createSlice({
   },
 });
 
-export const { addOrder, updateOrder, toggleItemReady } = ordersSlice.actions;
+export const { 
+  addOrder, 
+  updateOrder, 
+  toggleItemReady,
+  markOrderAsViewed  // ✅ ADD: Export the new action
+} = ordersSlice.actions;
+
 export default ordersSlice.reducer;

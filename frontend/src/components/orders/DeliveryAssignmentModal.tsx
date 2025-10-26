@@ -35,6 +35,12 @@ export default function DeliveryAssignmentModal({
   const [error, setError] = useState<string | null>(null);
   
   const token = useAppSelector((state) => state.auth.token);
+  const assetBase = (import.meta.env.VITE_ASSET_URL as string) || '';
+  const buildAssetUrl = (img?: string) => {
+    if (!img) return '';
+    if (/^https?:\/\//i.test(img)) return img; // already absolute
+    return `${assetBase.replace(/\/$/, '')}/${img.replace(/^\//, '')}`;
+  };
 
   // Fetch delivery men when modal opens
   useEffect(() => {
@@ -200,7 +206,7 @@ export default function DeliveryAssignmentModal({
                       <div className="flex-shrink-0">
                         {dm.image ? (
                           <img
-                            src={dm.image}
+                            src={buildAssetUrl(dm.image)}
                             alt={`${dm.f_name} ${dm.l_name}`}
                             className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
                           />
