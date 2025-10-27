@@ -20,6 +20,7 @@ export interface ElectronAPI {
   closeWindow: () => void;
   toggleFullscreen: () => void;
   isMaximized: () => Promise<boolean>;
+  getAppVersion: () => Promise<string>;
   autoUpdater: {
         onUpdateAvailable: (callback: (info: any) => void) => void;
         onUpdateProgress: (callback: (progress: any) => void) => void;

@@ -51,6 +51,7 @@ function createWindow() {
       contextIsolation: true,
       sandbox: false,
       webSecurity: false, // ⭐ CRITICAL: Allow loading from file:// protocol
+      devTools: isDev,
     },
     autoHideMenuBar: true,
     backgroundColor: '#0f172a',
@@ -88,7 +89,7 @@ function createWindow() {
       });
     
     // Open DevTools automatically for debugging
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools();
     
     // Log when DOM is ready
     mainWindow.webContents.on('dom-ready', () => {
@@ -275,6 +276,10 @@ ipcMain.handle('db:get-total-count', async (event, restaurantId: string) => {
     console.error('❌ Failed to get count:', error);
     return { success: false, error: error.message };
   }
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
 });
 
 // Add handler for user-initiated download

@@ -1,5 +1,5 @@
 // components/Sidebar.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Home, ClipboardList, Settings, ChevronLeft, ChevronRight, History, Truck } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -48,7 +48,25 @@ const navigationItems: NavItem[] = [
 export default function Sidebar() {
   const dispatch = useAppDispatch();
   const sidebarOpen = useAppSelector((state) => state.ui.sidebarOpen);
-  const version = import.meta.env.VITE_APP_VERSION || '0.0.0';
+  const [version, setVersion] = useState('0.0.0');
+
+useEffect(() => {
+  const fetchVersion = async () => {
+    if (window.electron?.getAppVersion) {
+      try {
+        const ver = await window.electron.getAppVersion();
+        setVersion(ver);
+      } catch (error) {
+        console.error('Failed to get version:', error);
+        setVersion('0.0.0');
+      }
+    } else {
+      setVersion(import.meta.env.VITE_APP_VERSION || '0.0.0');
+    }
+  };
+  
+  fetchVersion();
+}, []);
 
   const handleToggle = () => {
     dispatch(toggleSidebar());

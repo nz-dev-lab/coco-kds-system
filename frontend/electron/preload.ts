@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { app, contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electron', {
   // Window controls
@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('electron', {
   invoke: (channel: string, ...args: any[]) => {
     return ipcRenderer.invoke(channel, ...args);
   },
+
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
 
  // Auto-update specific (REPLACE existing ones)
   autoUpdater: {
