@@ -50,7 +50,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
-      webSecurity: false, // ⭐ CRITICAL: Allow loading from file:// protocol
+      webSecurity: false,
       devTools: isDev,
     },
     autoHideMenuBar: true,
@@ -87,9 +87,6 @@ function createWindow() {
         console.error('❌ Failed to load index.html:', err);
         console.error('📂 Tried path:', indexPath);
       });
-    
-    // Open DevTools automatically for debugging
-    // mainWindow.webContents.openDevTools();
     
     // Log when DOM is ready
     mainWindow.webContents.on('dom-ready', () => {
@@ -166,16 +163,17 @@ function setupAutoUpdater(window: BrowserWindow) {
     console.log('🔍 Checking for updates...');
   });
 
-autoUpdater.on('update-available', (info) => {
-  console.log('✅ Update available:', info.version);
-  // Send to renderer - let user decide
-  window.webContents.send('update_available', {
-    version: info.version,
-    releaseNotes: info.releaseNotes,
-    releaseDate: info.releaseDate,
+  autoUpdater.on('update-available', (info) => {
+    console.log('✅ Update available:', info.version);
+    // Send to renderer - let user decide
+    window.webContents.send('update_available', {
+      version: info.version,
+      releaseNotes: info.releaseNotes,
+      releaseDate: info.releaseDate,
+    });
+    // ⭐ DON'T auto-download - wait for user to click "Download Now"
+    console.log('⏳ Waiting for user action...');
   });
-  // DON'T auto-download - wait for user confirmation
-});
 
   autoUpdater.on('update-not-available', (info) => {
     console.log('✓ App is up to date:', info.version);
@@ -183,16 +181,27 @@ autoUpdater.on('update-available', (info) => {
 
   autoUpdater.on('error', (error) => {
     console.error('❌ Auto-updater error:', error.message);
+    window.webContents.send('update_error', error.message);
   });
 
   autoUpdater.on('download-progress', (progress) => {
-    console.log(`📥 Download progress: ${Math.round(progress.percent)}%`);
-    window.webContents.send('update_progress', progress);
+    const percent = Math.round(progress.percent);
+    console.log(`📥 Download progress: ${percent}%`);
+    window.webContents.send('update_progress', {
+      percent,
+      transferred: progress.transferred,
+      total: progress.total,
+      bytesPerSecond: progress.bytesPerSecond,
+    });
   });
 
   autoUpdater.on('update-downloaded', (info) => {
     console.log('✅ Update downloaded:', info.version);
-    window.webContents.send('update_downloaded', info);
+    console.log('🔄 Ready to install - waiting for user...');
+    window.webContents.send('update_downloaded', {
+      version: info.version,
+      releaseNotes: info.releaseNotes,
+    });
   });
 }
 
@@ -282,31 +291,32 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
 
-// Add handler for user-initiated download
+// ⭐ AUTO-UPDATE USER ACTIONS
 ipcMain.on('download-update', () => {
-  console.log('📥 User initiated update download');
-  autoUpdater.downloadUpdate();
+  console.log('📥 USER CLICKED "Download Now" - starting download...');
+  if (!isDev) {
+    autoUpdater.downloadUpdate();
+  } else {
+    console.log('⚠️ Download skipped - dev mode');
+  }
 });
 
-// Add handler for user-initiated install
 ipcMain.on('install-update', () => {
-  console.log('🔄 Installing update and restarting...');
-  autoUpdater.quitAndInstall(false, true);
-  // false = don't force, true = restart after install
+  console.log('🔄 USER CLICKED "Install & Restart" - installing...');
+  if (!isDev) {
+    autoUpdater.quitAndInstall(false, true);
+  } else {
+    console.log('⚠️ Install skipped - dev mode');
+  }
 });
 
+// PRINTER IPC HANDLERS
 ipcMain.handle('get-printers', async () => {
   try {
     const win = BrowserWindow.getFocusedWindow();
     if (!win) {
       throw new Error('No focused window');
     }
-
-    // webContents.getPrinters() may be missing from your installed type defs.
-    // Cast to a compatible shape (returns Electron.PrinterInfo[] synchronously).
-    // const webContentsWithPrinters = win.webContents as unknown as {
-    //   getPrinters(): import('electron').PrinterInfo[];
-    // };
 
     const printers = await win.webContents.getPrintersAsync();
     console.log('📄 Available printers:', printers.map(p => p.name));
@@ -338,7 +348,7 @@ ipcMain.handle('print-order', async (event, orderHtml: string, printerName?: str
     // Load the HTML content
     await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(orderHtml)}`);
 
-      // compute dynamic height (in microns) based on rendered content
+    // compute dynamic height (in microns) based on rendered content
     const contentHeightMicrons = await printWindow.webContents.executeJavaScript(`
       (function () {
         // create a hidden 1mm element to measure px per mm
@@ -397,7 +407,6 @@ ipcMain.handle('print-order', async (event, orderHtml: string, printerName?: str
   }
 });
 
-// Optional: Get default printer
 ipcMain.handle('get-default-printer', async () => {
   try {
     const win = BrowserWindow.getFocusedWindow();
@@ -405,10 +414,6 @@ ipcMain.handle('get-default-printer', async () => {
       throw new Error('No focused window');
     }
     
-    // const webContentsWithPrinters = win.webContents as unknown as {
-    //   getPrinters(): import('electron').PrinterInfo[];
-    // };
-
     const printers = await win.webContents.getPrintersAsync();
     const defaultPrinter = printers.find(p => p.isDefault);
     
