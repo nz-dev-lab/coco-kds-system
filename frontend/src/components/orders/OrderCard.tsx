@@ -657,7 +657,7 @@ return (
             className={`w-full py-2.5 mb-2 font-semibold rounded-lg transition-colors ${
               scheduledInfo.isScheduled && !scheduledInfo.canStartPreparing
                 ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                : 'bg-amber-600 hover:bg-amber-700 text-white'
+                : 'bg-teal-600 hover:bg-amber-700 text-white'
             }`}
             title={scheduledInfo.isScheduled && !scheduledInfo.canStartPreparing && scheduledInfo.prepWindowOpens
               ? `Locked until ${scheduledInfo.prepWindowOpens.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}`
