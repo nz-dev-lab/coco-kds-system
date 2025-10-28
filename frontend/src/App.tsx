@@ -1,12 +1,12 @@
 // src/App.tsx
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'; // ⭐ Changed BrowserRouter to HashRouter
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'; 
 import { useAppSelector } from './store/hooks';
 import MainLayout from './components/Layout/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Dispatch from './pages/Dispatch';
-import { ToastContainer } from 'react-toastify';  // ✅ ADD THIS
+import { ToastContainer } from 'react-toastify'; 
 import 'react-toastify/dist/ReactToastify.css';
 import UpdateManager from './components/UpdateManager';
 
@@ -77,7 +77,7 @@ function App() {
       {/* ✅ ADD THIS - Toast Notification Container */}
       <ToastContainer
         position="top-right"
-        autoClose={3000}
+        autoClose={5000}
         hideProgressBar={false}
         newestOnTop
         closeOnClick

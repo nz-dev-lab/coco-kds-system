@@ -1,6 +1,6 @@
 {
   "name": "kds-frontend",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Kitchen Display System - Electron + React",
   "main": "dist-electron/main.js",
   "author": "Nz-Dev-Lab",
@@ -54,7 +54,7 @@
   },
   "build": {
     "appId": "com.kds.kitchen-display-system",
-    "productName": "Coco KDS",
+    "productName": "Coco.KDS",
     "directories": {
       "output": "release",
       "buildResources": "build"
