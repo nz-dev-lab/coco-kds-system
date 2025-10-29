@@ -1,6 +1,6 @@
 {
   "name": "kds-frontend",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "Kitchen Display System - Electron + React",
   "main": "dist-electron/main.js",
   "author": "Nz-Dev-Lab",
@@ -85,6 +85,7 @@
       "target": [
         "dmg"
       ],
+      "artifactName": "Coco.KDS-${version}.${ext}",
       "category": "public.app-category.business"
     },
     "win": {
@@ -96,12 +97,14 @@
           ]
         }
       ],
+      "artifactName": "Coco.KDS.Setup.${version}.${ext}",
       "icon": "build/icon.png"
     },
     "linux": {
       "target": [
         "AppImage"
       ],
+      "artifactName": "Coco.KDS-${version}.${ext}",
       "category": "Office"
     },
     "deb": {
