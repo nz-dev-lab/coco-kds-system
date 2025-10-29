@@ -14,6 +14,7 @@ import { useOrderBump } from '../../hooks/useOrderBump';
 import { usePrintOrder } from '../../hooks/usePrintOrder';
 import { Order } from '@/types/order.type';
 import { markOrderAsViewed } from '../../store/slices/ordersSlice';
+import { useHeaderDoubleTap } from '@/hooks/useHeaderDoubleTap';
 
 // interface Order {
 //   id: string;
@@ -70,7 +71,8 @@ export default function OrderCard({ order }: OrderCardProps) {
 
   // Get restaurant ID from Redux auth state
   const restaurantId = useAppSelector((state) => state.auth.restaurant?.id);
-  const requireDoubleTap = useAppSelector((s) => s.ui.settings.requireDoubleTap);
+  const requireDoubleTap = useAppSelector((s) => s.ui.settings.interaction.requireDoubleTap);
+  const processingMode = useAppSelector((s) => s.ui.settings.interaction.processingMode);
   const { handleBump: bumpOrder } = useOrderBump();
   // Check if this is a new order
   const isNewOrder = useAppSelector((state) => 
@@ -292,6 +294,17 @@ const handleComplete = async () => {
   // Track previous scheduled status
   const prevStatusRef = useRef<'locked' | 'ready' | 'overdue' | undefined>(undefined);
 
+
+  const { handleHeaderDoubleTap, isEnabled: isHeaderMode } = useHeaderDoubleTap({
+  order,
+  scheduledInfo,
+  orderAge,
+  handleConfirm,
+  handleStartCooking,
+  handleMarkReady,
+  stopAnimation,
+});
+
   // Auto-stop animation after 20 seconds
 useEffect(() => {
   if (isNewOrder && showAnimation) {
@@ -373,7 +386,10 @@ return (
       ${showAnimation ? 'new-order-animation' : ''}
     `}>
       {/* Header */}
-      <div className={`${config.bg} px-3 sm:px-4 py-3 rounded-t-lg`}>
+      <div className={`${config.bg} px-3 sm:px-4 py-3 rounded-t-lg ${isHeaderMode ? 'cursor-pointer select-none' : ''} `}
+        onDoubleClick={isHeaderMode ? handleHeaderDoubleTap : undefined}
+        title={isHeaderMode ? 'Double-tap header to progress order' : undefined}
+      >
         <div className="flex items-center justify-between gap-2">
           {/* Left side: Order # + Badges */}
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
@@ -639,7 +655,9 @@ return (
 
       {/* Fixed Bottom Action Buttons */}
       <div className="p-4 pt-0 border-t border-slate-100 flex-shrink-0 mt-auto">
-        {/* Confirm Order */}
+        {processingMode === 'buttons' && (
+          <>
+          {/* Confirm Order */}
         {order.order_status === 'pending' && (
            <button
               {...actionTriggerProps(handleConfirm)}
@@ -657,7 +675,7 @@ return (
             className={`w-full py-2.5 mb-2 font-semibold rounded-lg transition-colors ${
               scheduledInfo.isScheduled && !scheduledInfo.canStartPreparing
                 ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                : 'bg-teal-600 hover:bg-amber-700 text-white'
+                : 'bg-teal-600 hover:bg-teal-700 text-white'
             }`}
             title={scheduledInfo.isScheduled && !scheduledInfo.canStartPreparing && scheduledInfo.prepWindowOpens
               ? `Locked until ${scheduledInfo.prepWindowOpens.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}`
@@ -697,6 +715,8 @@ return (
           >
             Complete Order
           </button>
+        )}
+          </>
         )}
 
         {/* Delivery Order Info Banner */}

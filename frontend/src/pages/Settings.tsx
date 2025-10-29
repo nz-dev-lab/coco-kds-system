@@ -8,12 +8,16 @@ import {
   setVoiceVolume,
   resetSettings,
   toggleRequireDoubleTap,
+  setProcessingMode,
+  setRequireDoubleTap,
 } from '../store/slices/uiSlice';
 import { audioNotificationService } from '../utils/audioNotifications';
 
 export default function Settings() {
   const dispatch = useAppDispatch();
   const settings = useAppSelector((state) => state.ui.settings);
+
+  console.log('Current Settingss:', settings); // Debug log
 
   const handleTestReady = async () => {
     await audioNotificationService.testReadySound();
@@ -197,21 +201,68 @@ export default function Settings() {
       {/* Interaction Settings */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold text-slate-800 mb-4">Interaction</h2>
-
         <div className="flex items-center justify-between py-3 border-b">
           <div>
+            <p className="font-medium text-slate-800">Order Processing Mode</p>
+          <p className="text-sm text-slate-500">Choose how orders are processed: action buttons or header double-tap.</p>
+          </div>
+          <div className="flex gap-3">
+    <button
+      onClick={() => dispatch(setProcessingMode('buttons'))}
+      className={`flex-1 px-4 py-2 rounded-lg border transition-colors ${
+        settings.interaction.processingMode === 'buttons'
+          ? 'bg-blue-600 text-white border-blue-600'
+          : 'bg-white border-slate-300 text-slate-600 hover:border-blue-400'
+      }`}
+    >
+      Buttons Mode
+    </button>
+
+    <button
+      onClick={() => dispatch(setProcessingMode('header'))}
+      className={`flex-1 px-4 py-2 rounded-lg border transition-colors ${
+        settings.interaction.processingMode === 'header'
+          ? 'bg-blue-600 text-white border-blue-600'
+          : 'bg-white border-slate-300 text-slate-600 hover:border-blue-400'
+      }`}
+    >
+      Header Mode
+    </button>
+    
+  </div>
+  
+        </div>
+
+        {/* Require double-tap (disabled when Header mode is active) */}
+        <div
+          className={`flex items-center justify-between py-3 border-b ${
+            settings.interaction.processingMode === 'header' ? 'opacity-50 pointer-events-none' : ''
+          }`}
+          aria-disabled={settings.interaction.processingMode === 'header'}
+        >
+          <div>
             <p className="font-medium text-slate-800">Require double-tap to confirm actions</p>
-            <p className="text-sm text-slate-500">When enabled, action buttons require a double-click / double-tap</p>
+            <p className="text-sm text-slate-500">
+              When enabled, action buttons require a double-click / double-tap
+              {settings.interaction.processingMode === 'header' && (
+                <span className="ml-2 text-xs italic text-slate-400">(disabled in Header mode)</span>
+              )}
+            </p>
           </div>
           <button
-            onClick={() => dispatch(toggleRequireDoubleTap())}
+            onClick={() => {
+              if (settings.interaction.processingMode === 'header') return;
+              dispatch(setRequireDoubleTap());
+            }}
+            disabled={settings.interaction.processingMode === 'header'}
             className={`relative w-14 h-7 rounded-full transition-colors ${
-              settings.requireDoubleTap ? 'bg-green-500' : 'bg-slate-300'
-            }`}
+              settings.interaction.requireDoubleTap ? 'bg-green-500' : 'bg-slate-300'
+            } ${settings.interaction.processingMode === 'header' ? 'cursor-not-allowed' : ''}`}
+            aria-pressed={settings.interaction.requireDoubleTap}
           >
             <span
               className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
-                settings.requireDoubleTap ? 'translate-x-7' : 'translate-x-0'
+                settings.interaction.requireDoubleTap ? 'translate-x-7' : 'translate-x-0'
               }`}
             />
           </button>

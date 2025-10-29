@@ -18,6 +18,10 @@ interface UIState {
       autoRefresh: boolean;
     };
     requireDoubleTap: boolean;
+    interaction: {
+      processingMode: 'buttons' | 'header';
+      requireDoubleTap: boolean;
+    };
   };
 }
 
@@ -45,6 +49,10 @@ const loadSettings = (): UIState['settings'] => {
       autoRefresh: true,
     },
     requireDoubleTap: true,
+    interaction: {
+      processingMode: 'buttons',
+      requireDoubleTap: true,
+    }
   };
 };
 
@@ -119,6 +127,16 @@ const uiSlice = createSlice({
       state.settings.requireDoubleTap = !state.settings.requireDoubleTap;
       localStorage.setItem('kds-settings', JSON.stringify(state.settings));
     },
+
+    //Interaction settings
+    setProcessingMode: (state, action: PayloadAction<'buttons' | 'header'>) => {
+      state.settings.interaction.processingMode = action.payload;
+      localStorage.setItem('kds-settings', JSON.stringify(state.settings));
+    },
+    setRequireDoubleTap(state){
+      state.settings.interaction.requireDoubleTap = !state.settings.interaction.requireDoubleTap;
+      localStorage.setItem('kds-settings', JSON.stringify(state.settings));
+    },
     
     // Reset to defaults
     resetSettings: (state) => {
@@ -134,6 +152,10 @@ const uiSlice = createSlice({
           autoRefresh: true,
         },
         requireDoubleTap: true,
+        interaction: {
+          processingMode: 'buttons',
+          requireDoubleTap: true,
+        }
       };
       localStorage.setItem('kds-settings', JSON.stringify(state.settings));
     },
@@ -155,6 +177,8 @@ export const {
   toggleShowOrderAge,
   toggleAutoRefresh,
   toggleRequireDoubleTap,
+  setProcessingMode,
+  setRequireDoubleTap,
   resetSettings,
 } = uiSlice.actions;
 
