@@ -51,7 +51,7 @@ function createWindow() {
       contextIsolation: true,
       sandbox: false,
       webSecurity: false,
-      // devTools: isDev,
+      devTools: isDev,
     },
     autoHideMenuBar: true,
     backgroundColor: '#0f172a',
@@ -79,8 +79,8 @@ function createWindow() {
     console.log('📄 Loading from:', indexPath);
 
     //open devtools for diagnostics
-    mainWindow.webContents.openDevTools();
-    console.log('🔧 Opening DevTools for diagnostics') ;
+    // mainWindow.webContents.openDevTools();
+    // console.log('🔧 Opening DevTools for diagnostics') ;
     
     mainWindow.loadFile(indexPath)
       .then(() => {
