@@ -3,7 +3,7 @@ import { User, Printer, AlertCircle, Bike, CalendarClock, ShoppingBag, CookingPo
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { toggleItemReady, updateOrderStatus } from '../../store/slices/ordersSlice';
 import DeliveryDetailsModal from './DeliveryDetailsModal';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getScheduledInfo, formatCountdown } from '../../utils/scheduledOrderUtils';
 import { audioNotificationService } from '@/utils/audioNotifications';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
@@ -15,6 +15,7 @@ import { usePrintOrder } from '../../hooks/usePrintOrder';
 import { Order } from '@/types/order.type';
 import { markOrderAsViewed } from '../../store/slices/ordersSlice';
 import { useHeaderDoubleTap } from '@/hooks/useHeaderDoubleTap';
+import { setFocusedOrder, addRecentlyUpdated, releaseFocus, removeRecentlyUpdated } from '@/store/slices/uiSlice';
 
 // interface Order {
 //   id: string;
@@ -60,9 +61,10 @@ import { useHeaderDoubleTap } from '@/hooks/useHeaderDoubleTap';
 
 interface OrderCardProps {
   order: Order;
+  gridPosition: number;  // New prop for grid position
 }
 
-export default function OrderCard({ order }: OrderCardProps) {
+export default function OrderCard({ order, gridPosition }: OrderCardProps) {
   const dispatch = useAppDispatch();
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -73,6 +75,10 @@ export default function OrderCard({ order }: OrderCardProps) {
   const restaurantId = useAppSelector((state) => state.auth.restaurant?.id);
   const requireDoubleTap = useAppSelector((s) => s.ui.settings.interaction.requireDoubleTap);
   const processingMode = useAppSelector((s) => s.ui.settings.interaction.processingMode);
+  const focusedOrderId = useAppSelector((state) => state.ui.focusedOrderId);
+  const recentlyUpdatedIds = useAppSelector((state) => state.ui.recentlyUpdatedOrderIds);
+  const isFocused = order.id === focusedOrderId;
+  const isRecentlyUpdated = recentlyUpdatedIds.includes(order.id);
   const { handleBump: bumpOrder } = useOrderBump();
   // Check if this is a new order
   const isNewOrder = useAppSelector((state) => 
@@ -205,9 +211,14 @@ const stopAnimation = () => {
     }
   };
 
-const handleBump = async () => {
+// Memoize wrapper for button mode
+const handleBump = useCallback(async () => {
+  dispatch(setFocusedOrder({ orderId: order.id, position: gridPosition }));
   await bumpOrder(order, orderAge);
-};
+  dispatch(releaseFocus());
+
+   dispatch(addRecentlyUpdated(order.id));
+}, [bumpOrder, order, orderAge, dispatch]);
 
  const handleAssignDelivery = () => {
   setShowAssignModal(true);
@@ -228,49 +239,49 @@ const handleAssignDeliveryMan = async (deliveryManId: number) => {
 };
 
 
-  const handleConfirm = async () => {
+const handleConfirm = useCallback(async () => {
   try {
     stopAnimation();
+    
+    dispatch(setFocusedOrder({ orderId: order.id, position: gridPosition }));
     await dispatch(updateOrderStatus({
       orderId: order.id,
       status: 'confirmed',
     })).unwrap();
-    
-    console.log('✅ Order confirmed:', order.id);
+    dispatch(addRecentlyUpdated(order.id));
   } catch (error) {
     console.error('❌ Failed to confirm order:', error);
-    // TODO: Show error toast/notification
   }
-};
+}, [dispatch, order.id, stopAnimation]);
 
-  const handleStartCooking = async () => {
+const handleStartCooking = useCallback(async () => {
   try {
     stopAnimation();
-    // For scheduled orders, could add processing_time prompt
+    
+    dispatch(setFocusedOrder({ orderId: order.id, position: gridPosition }));
     await dispatch(updateOrderStatus({
       orderId: order.id,
       status: 'processing',
-      // processingTime: '15', // Optional: add modal to ask for time
     })).unwrap();
-    
-    console.log('✅ Order moved to processing:', order.id);
+    dispatch(addRecentlyUpdated(order.id));
   } catch (error) {
     console.error('❌ Failed to start cooking:', error);
   }
-};
+}, [dispatch, order.id, stopAnimation]);
 
-const handleMarkReady = async () => {
+const handleMarkReady = useCallback(async () => {
   try {
+    
+    dispatch(setFocusedOrder({ orderId: order.id, position: gridPosition }));
     await dispatch(updateOrderStatus({
       orderId: order.id,
       status: 'handover',
     })).unwrap();
-    
-    console.log('✅ Order marked as ready:', order.id);
+    dispatch(addRecentlyUpdated(order.id));
   } catch (error) {
-    console.error('❌ Failed to mark order ready:', error);
+    console.error('❌ Failed to mark ready:', error);
   }
-};
+}, [dispatch, order.id]);
 
 const handleComplete = async () => {
   try {
@@ -302,6 +313,7 @@ const handleComplete = async () => {
   handleConfirm,
   handleStartCooking,
   handleMarkReady,
+  handleBump: bumpOrder,
   stopAnimation,
 });
 
@@ -370,6 +382,38 @@ useEffect(() => {
   //   console.log('Rendering OrderCard for order:', order.id, order);
   // }
 
+  useEffect(() => {
+  const handleClickOutside = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('.order-card') && isFocused) {
+      dispatch(releaseFocus());
+    }
+  };
+  
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [isFocused, dispatch]);
+
+useEffect(() => {
+  if (!isFocused) return;
+  
+  const timeout = setTimeout(() => {
+    dispatch(releaseFocus());
+  }, 15000); // 15 seconds
+  
+  return () => clearTimeout(timeout);
+}, [isFocused, dispatch]);
+
+useEffect(() => {
+  if (!isRecentlyUpdated) return;
+  
+  const timeout = setTimeout(() => {
+    dispatch(removeRecentlyUpdated(order.id));
+  }, 5000); // 5 seconds
+  
+  return () => clearTimeout(timeout);
+}, [isRecentlyUpdated, order.id, dispatch]);
+
 return (
   <>
     {/* ✅ ORDER CARD - Container Query Enabled */}
@@ -384,9 +428,11 @@ return (
       max-w-[550px]
       w-full
       ${showAnimation ? 'new-order-animation' : ''}
+      ${isFocused ? 'ring-4 ring-blue-500 ring-opacity-50' : ''}
+      ${isRecentlyUpdated ? 'animate-pulse-border' : ''}
     `}>
       {/* Header */}
-      <div className={`${config.bg} px-3 sm:px-4 py-3 rounded-t-lg ${isHeaderMode ? 'cursor-pointer select-none' : ''} `}
+      <div className={`${config.bg} px-3 sm:px-4 py-3 rounded-t-lg ${isHeaderMode ? 'cursor-pointer select-none' : ''} ${isFocused ? 'relative' : ''} `}
         onDoubleClick={isHeaderMode ? handleHeaderDoubleTap : undefined}
         title={isHeaderMode ? 'Double-tap header to progress order' : undefined}
       >

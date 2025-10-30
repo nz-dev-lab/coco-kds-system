@@ -1,16 +1,20 @@
 // src/pages/Dashboard.tsx
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchOrders } from '../store/slices/ordersSlice';
 import OrderCard from '../components/orders/OrderCard';
 import { RefreshCw, Clock } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useLiveClock } from '../hooks/useLiveClock';
+import { clearRecentlyUpdated, releaseFocus } from '@/store/slices/uiSlice';
 
 export default function Dashboard() {
   const dispatch = useAppDispatch();
   const { orders, loading, error } = useAppSelector((state) => state.orders);
-  const sidebarOpen = useAppSelector((state) => state.ui.sidebarOpen); 
+  const sidebarOpen = useAppSelector((state) => state.ui.sidebarOpen);
+  const focusedOrderId = useAppSelector((state) => state.ui.focusedOrderId);
+  const focusedOrderPosition = useAppSelector((state) => state.ui.focusedOrderPosition);
+  const recentlyUpdatedIds = useAppSelector((state) => state.ui.recentlyUpdatedOrderIds); 
   
   // Live clock that updates every second
   const currentTime = useLiveClock();
@@ -28,6 +32,14 @@ export default function Dashboard() {
 
     // return () => clearInterval(interval);
   }, [dispatch]);
+
+  useEffect(() => {
+  return () => {
+    // Clear focus and highlights when leaving dashboard
+    dispatch(releaseFocus());
+    dispatch(clearRecentlyUpdated());
+  };
+}, [dispatch]);
 
   // Filter out delivered orders
   const activeOrders = orders.filter((order) => {
@@ -49,20 +61,32 @@ export default function Dashboard() {
     delivered: 5,
   };
 
-  const sortedOrders = [...activeOrders].sort((a, b) => {
-    // First, sort by status priority
+ const sortedOrders = useMemo(() => {
+  // 1. Sort all orders by priority first
+  const sorted = [...activeOrders].sort((a, b) => {
     const statusDiff = (statusPriority[a.order_status] || 99) - (statusPriority[b.order_status] || 99);
-    
-    if (statusDiff !== 0) {
-      return statusDiff; // Different status, use priority
-    }
-    
-    // Same status, sort by creation time (newest first)
+    if (statusDiff !== 0) return statusDiff;
     const timeA = new Date(a.created_at ?? 0).getTime();
     const timeB = new Date(b.created_at ?? 0).getTime();
-    
-    return timeB - timeA; // Newest first (descending order)
+    return timeB - timeA;
   });
+  
+  // 2. If there's a focused order, keep it at its original position
+  if (focusedOrderId && focusedOrderPosition !== null) {
+    const focusedIndex = sorted.findIndex(o => o.id === focusedOrderId);
+    
+    if (focusedIndex > -1) {
+      // Remove focused order from its sorted position
+      const [focusedOrder] = sorted.splice(focusedIndex, 1);
+      
+      // Insert at original position (or as close as possible)
+      const insertPosition = Math.min(focusedOrderPosition, sorted.length);
+      sorted.splice(insertPosition, 0, focusedOrder);
+    }
+  }
+  
+  return sorted;
+}, [activeOrders, focusedOrderId, focusedOrderPosition]);
 
   const handleRefresh = () => {
     dispatch(fetchOrders());
@@ -88,6 +112,8 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  
 
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-kds-bg">
@@ -176,9 +202,13 @@ export default function Dashboard() {
               : 'lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
             }
           `}>
-            {sortedOrders.map((order) => (
-              <OrderCard key={order.id} order={order} />
-            ))}
+            {sortedOrders.map((order, index) => (
+  <OrderCard 
+    key={order.id} 
+    order={order} 
+    gridPosition={index}  /* ✨ PASS POSITION */
+  />
+))}
           </div>
         )}
       </div>
