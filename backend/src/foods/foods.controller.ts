@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FoodsService } from './foods.service';
-import { UpdateFoodStatusDto } from './dto/update-food.-status.dto';
+import { UpdateFoodStatusDto } from './dto/update-food-status.dto';
 
 // Define the request type with user info from JWT
 interface RequestWithRestaurant extends Request {
