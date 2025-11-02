@@ -28,7 +28,7 @@ interface RequestWithRestaurant extends Request {
 }
 
 @ApiTags('Foods')           // ← ADD: Groups in Swagger UI
-@ApiBearerAuth()            // ← ADD: Tells Swagger to send Authorization header
+@ApiBearerAuth('JWT-auth')            // ← ADD: Tells Swagger to send Authorization header
 @Controller('api/kds/foods')
 @UseGuards(JwtAuthGuard)
 export class FoodsController {
