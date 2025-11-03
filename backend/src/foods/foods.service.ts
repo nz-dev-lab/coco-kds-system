@@ -125,8 +125,12 @@ async updateStatus(
       throw new NotFoundException(`Food item with ID ${foodId} not found`);
     }
 
+    // Convert both to numbers explicitly for comparison
+  const foodRestaurantId = Number(food.restaurant_id);
+  const requestRestaurantId = Number(restaurantId);
+
     // Security check: Ensure food belongs to this restaurant
-    if (food.restaurant_id !== restaurantId) {
+    if (foodRestaurantId !== requestRestaurantId) {
       throw new ForbiddenException(
         'You do not have permission to view this food item',
       );
