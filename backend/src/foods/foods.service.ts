@@ -47,57 +47,68 @@ export class FoodsService {
    * @throws NotFoundException if food doesn't exist
    * @throws ForbiddenException if food doesn't belong to restaurant
    */
-  async updateStatus(
-    foodId: number,
-    status: number,
-    restaurantId: number,
-  ): Promise<Food> {
-    // First, find the food item
-    const food = await this.foodRepository.findOne({
-      where: { id: foodId },
-    });
+async updateStatus(
+  foodId: number,
+  status: number,
+  restaurantId: number,
+): Promise<Food> {
+  // First, find the food item
+  const food = await this.foodRepository.findOne({
+    where: { id: foodId },
+  });
 
-    // Check if food exists
-    if (!food) {
-      throw new NotFoundException(`Food item with ID ${foodId} not found`);
-    }
-
-    // Security check: Ensure food belongs to this restaurant
-    if (food.restaurant_id !== restaurantId) {
-      this.logger.warn(`Restaurant ${restaurantId} attempted to modify food ${foodId} belonging to restaurant ${food.restaurant_id}`);
-      throw new ForbiddenException(
-        'You do not have permission to modify this food item',
-      );
-    }
-
-    // Update the status
-    const result = await this.foodRepository.update(
-      { id: foodId, restaurant_id: restaurantId },
-      { status },
-    );
-
-    // Check if update was successful
-    if (result.affected === 0) {
-      throw new NotFoundException(
-        `Failed to update food item with ID ${foodId}`,
-      );
-    }
-
-    // Return the updated food item
-    const updatedFood = await this.foodRepository.findOne({ 
-      where: { id: foodId } 
-    });
-
-    // This should never happen since we already checked, but TypeScript needs it
-    if (!updatedFood) {
-      throw new NotFoundException(
-        `Food item with ID ${foodId} not found after update`,
-      );
-    }
-
-    return updatedFood;
+  // Check if food exists
+  if (!food) {
+    throw new NotFoundException(`Food item with ID ${foodId} not found`);
   }
 
+  // Convert both to numbers explicitly for comparison
+  const foodRestaurantId = Number(food.restaurant_id);
+  const requestRestaurantId = Number(restaurantId);
+
+  // Add debug logging
+  this.logger.log(
+    `Comparing restaurants: food.restaurant_id=${foodRestaurantId} (${typeof foodRestaurantId}), ` +
+    `restaurantId=${requestRestaurantId} (${typeof requestRestaurantId}), ` +
+    `equal=${foodRestaurantId === requestRestaurantId}`
+  );
+
+  // Security check: Ensure food belongs to this restaurant
+  if (foodRestaurantId !== requestRestaurantId) {
+    this.logger.warn(
+      `Restaurant ${requestRestaurantId} attempted to modify food ${foodId} belonging to restaurant ${foodRestaurantId}`
+    );
+    throw new ForbiddenException(
+      'You do not have permission to modify this food item',
+    );
+  }
+
+  // Update the status
+  const result = await this.foodRepository.update(
+    { id: foodId, restaurant_id: restaurantId },
+    { status },
+  );
+
+  // Check if update was successful
+  if (result.affected === 0) {
+    throw new NotFoundException(
+      `Failed to update food item with ID ${foodId}`,
+    );
+  }
+
+  // Return the updated food item
+  const updatedFood = await this.foodRepository.findOne({ 
+    where: { id: foodId } 
+  });
+
+  if (!updatedFood) {
+    throw new NotFoundException(
+      `Food item with ID ${foodId} not found after update`,
+    );
+  }
+
+  return updatedFood;
+}
   /**
    * Get a single food item by ID
    * @param foodId - The ID of the food item
