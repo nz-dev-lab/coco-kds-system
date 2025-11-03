@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Food } from './entities/food.entity';
 
 @Injectable()
 export class FoodsService {
+  private readonly logger =  new Logger(FoodsService.name);
   constructor(
     @InjectRepository(Food)
     private readonly foodRepository: Repository<Food>,
@@ -63,6 +64,7 @@ export class FoodsService {
 
     // Security check: Ensure food belongs to this restaurant
     if (food.restaurant_id !== restaurantId) {
+      this.logger.warn(`Restaurant ${restaurantId} attempted to modify food ${foodId} belonging to restaurant ${food.restaurant_id}`);
       throw new ForbiddenException(
         'You do not have permission to modify this food item',
       );
