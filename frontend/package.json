@@ -1,6 +1,6 @@
 {
   "name": "kds-frontend",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "Kitchen Display System - Electron + React",
   "main": "dist-electron/main.js",
   "author": "Nz-Dev-Lab",
