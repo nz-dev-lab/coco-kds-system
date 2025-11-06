@@ -166,9 +166,9 @@ export class NotificationsService {
     return `zone_${zoneId}_${target}`;
   }
 
-  /**
+ /**
  * Upload notification image to Laravel's storage directory
- * Matches Laravel's storage structure: storage/app/public/notification/
+ * Using Docker volume mount: /app/storage → /var/www/rootuser.../storage/app/public
  */
 private async uploadImage(file: Express.Multer.File): Promise<string> {
   try {
@@ -178,27 +178,30 @@ private async uploadImage(file: Express.Multer.File): Promise<string> {
     const ext = path.extname(file.originalname);
     const filename = `${date}-${uuid}${ext}`;
 
-    // Laravel storage path: /var/www/rootuser.cocoeats.uk/public_html/storage/app/public/notification/
-    const uploadDir = '/var/www/rootuser.cocoeats.uk/public_html/storage/app/public/notification';
+    // Use Docker volume mount path (inside container)
+    const uploadDir = '/app/storage/notification';  // ← CHANGED
     const filePath = path.join(uploadDir, filename);
+
+    this.logger.log(`📁 Upload directory: ${uploadDir}`);
+    this.logger.log(`💾 Writing to: ${filePath}`);
 
     // Ensure directory exists
     await fs.mkdir(uploadDir, { recursive: true });
 
-    // Write file to Laravel's storage directory
+    // Write file to mounted volume
     await fs.writeFile(filePath, file.buffer);
 
     this.logger.log(`✅ Image uploaded successfully: ${filename}`);
-    this.logger.log(`   Path: ${filePath}`);
-    this.logger.log(`   URL: https://rootuser.cocoeats.uk/storage/notification/${filename}`);
+    this.logger.log(`   Container path: ${filePath}`);
+    this.logger.log(`   Host path: /var/www/rootuser.../storage/app/public/notification/${filename}`);
+    this.logger.log(`   Public URL: https://rootuser.cocoeats.uk/storage/notification/${filename}`);
 
     return filename;
   } catch (error) {
-    this.logger.error('Failed to upload image:', error.message);
+    this.logger.error(`❌ Failed to upload image: ${error.message}`);
     throw new BadRequestException('Failed to upload image');
   }
 }
-
   /**
    * Validate if Firebase is ready
    */
