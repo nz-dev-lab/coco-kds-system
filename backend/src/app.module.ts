@@ -5,6 +5,8 @@ import { OrdersModule } from './orders/orders.module';
 import { AuthModule } from './auth/auth.module';
 import { RedisModule } from './redis/redis.module';
 import { FoodsModule } from './foods/foods.module';
+import { AppConfigModule } from './config/config.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -35,6 +37,8 @@ import { FoodsModule } from './foods/foods.module';
     AuthModule,
     RedisModule,
     FoodsModule,
+    AppConfigModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}
