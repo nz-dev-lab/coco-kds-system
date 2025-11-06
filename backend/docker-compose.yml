@@ -7,4 +7,8 @@ services:
     network_mode: "host" 
     env_file:
       - ./.env
+    volumes:
+      # Mount Laravel's storage into container
+      - /var/www/rootuser.cocoeats.uk/public_html/storage/app/public:/app/storage:rw
+      #   ↑ Real path on EC2                                            ↑ Path inside container
     restart: unless-stopped
