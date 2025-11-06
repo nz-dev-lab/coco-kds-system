@@ -1,6 +1,6 @@
 {
   "name": "kds-frontend",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "description": "Kitchen Display System - Electron + React",
   "main": "dist-electron/main.js",
   "author": "Nz-Dev-Lab",
@@ -23,6 +23,7 @@
     "@reduxjs/toolkit": "^2.9.0",
     "@tailwindcss/container-queries": "^0.1.1",
     "better-sqlite3": "^12.4.1",
+    "date-fns": "^4.1.0",
     "electron-updater": "^6.3.9",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.545.0",

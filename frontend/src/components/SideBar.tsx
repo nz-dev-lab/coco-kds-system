@@ -1,7 +1,7 @@
 // components/Sidebar.tsx
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, ClipboardList, Settings, ChevronLeft, ChevronRight, History, Truck, Utensils } from 'lucide-react';
+import { Home, ClipboardList, Settings, ChevronLeft, ChevronRight, History, Truck, Utensils, BellRing } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { toggleSidebar } from '../store/slices/uiSlice';
 
@@ -36,6 +36,12 @@ const navigationItems: NavItem[] = [
     label: 'Foods',
     icon: Utensils,
     path: '/foods',
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: BellRing,
+    path: '/notifications',
   },
   {
     id: 'history',

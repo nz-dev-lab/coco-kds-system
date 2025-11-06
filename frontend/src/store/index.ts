@@ -4,6 +4,7 @@ import uiReducer from './slices/uiSlice';
 import authReducer from './slices/authSlice';
 import orddersReducer from './slices/ordersSlice';
 import foodsReducer from './slices/foodsSlice';
+import notificationsreducer from './slices/notificationsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -11,6 +12,7 @@ export const store = configureStore({
     auth: authReducer, // ← Add this
     orders: orddersReducer,
     foods: foodsReducer,
+    notifications: notificationsreducer,
   },
 });
 
