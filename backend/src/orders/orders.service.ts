@@ -195,6 +195,7 @@ export class OrdersService {
       order_status: order.order_status,
       order_type: order.order_type,
       payment_method: order.payment_method,
+      payment_status: order.payment_status || 'unpaid',
       order_amount: order.order_amount,
       processing_time: order.processing_time,
       order_note: order.order_note,
