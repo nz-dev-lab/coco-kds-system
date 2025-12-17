@@ -96,6 +96,26 @@ contextBridge.exposeInMainWorld('electron', {
 
 });
 
+// 🆕 TMBILL Plugin API (separate exposeInMainWorld call)
+contextBridge.exposeInMainWorld('tmbill', {
+  // Discovery
+  getServices: () => ipcRenderer.invoke('tmbill:get-services'),
+  startDiscovery: () => ipcRenderer.invoke('tmbill:start-discovery'),
+  stopDiscovery: () => ipcRenderer.invoke('tmbill:stop-discovery'),
+  
+  // State
+  getState: () => ipcRenderer.invoke('tmbill:get-state'),
+  getConfig: () => ipcRenderer.invoke('tmbill:get-config'),
+  
+  // Events
+  onServiceFound: (callback: (service: any) => void) => {
+    ipcRenderer.on('tmbill:service-found', (_, service) => callback(service));
+  },
+  onServiceLost: (callback: (name: string) => void) => {
+    ipcRenderer.on('tmbill:service-lost', (_, name) => callback(name));
+  },
+});
+
 // Type declarations
 declare global {
   interface Window {
@@ -105,6 +125,17 @@ declare global {
       invoke: (channel: string, ...args: any[]) => Promise<any>;
       onUpdateAvailable: (callback: () => void) => void;
       onUpdateDownloaded: (callback: () => void) => void;
+    };
+
+     // 🆕 Add TMBILL API types
+    tmbill: {
+      getServices: () => Promise<any[]>;
+      startDiscovery: () => Promise<{ success: boolean }>;
+      stopDiscovery: () => Promise<{ success: boolean }>;
+      getState: () => Promise<any>;
+      getConfig: () => Promise<any>;
+      onServiceFound: (callback: (service: any) => void) => void;
+      onServiceLost: (callback: (name: string) => void) => void;
     };
   }
 }

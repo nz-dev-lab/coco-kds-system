@@ -11,6 +11,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import UpdateManager from './components/UpdateManager';
 import Foods from './pages/Foods';
 import Notifications from './pages/Notifications';
+import TMBillDebugPanel from './features/tmbill/components/TmbillDebugPanel';
 
 // Temporary placeholder components
 const OrdersPage = () => (
@@ -69,6 +70,7 @@ function App() {
                     <Route path="/notifications" element={<Notifications />} />
                     <Route path="/history" element={<HistoryPage />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/tmbill-debug" element={<TMBillDebugPanel />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>
                 </MainLayout>

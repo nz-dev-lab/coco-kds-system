@@ -10,9 +10,12 @@ import {
   closeDatabase,
   statements 
 } from './database';
+import { TMBillPlugin } from './plugins/tmbill';
+
 
 let mainWindow: BrowserWindow | null = null;
 const isDev = process.env.NODE_ENV === 'development';
+let tmbillPlugin: TMBillPlugin | null = null;
 
 // Configure auto-updater (only in production)
 if (!isDev) {
@@ -106,11 +109,54 @@ function createWindow() {
         console.log('Script sources:', Array.from(document.scripts).map(s => s.src));
       `).catch(err => console.error('Failed to execute diagnostic script:', err));
     });
+
+  //   // Initialize TMBILL plugin
+  // const tmbillEnabled = process.env.ENABLE_TMBILL_PLUGIN === 'true';
+  
+  // if (tmbillEnabled) {
+  //   tmbillPlugin = new TMBillPlugin({
+  //     enabled: true,
+  //     serviceType: process.env.TMBILL_SERVICE_TYPE || '_tmbill._tcp',
+  //     autoConnect: process.env.TMBILL_AUTO_CONNECT === 'true',
+  //   });
+    
+  //   tmbillPlugin.initialize(mainWindow);
+  // } else {
+  //   console.log('⚠️  TMBILL plugin disabled (ENABLE_TMBILL_PLUGIN !== true)');
+  // }
+    
   }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+// 🆕 Initialize TMBILL plugin (MOVED HERE - works in both dev and production)
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('\n' + '='.repeat(70));
+    console.log('🔍 TMBILL Plugin Configuration Check');
+    console.log('='.repeat(70));
+    console.log('Environment:', isDev ? 'DEVELOPMENT' : 'PRODUCTION');
+    console.log('Node ENV:', process.env.NODE_ENV);
+    
+    // For development: always enable
+    // For production: check environment variable
+    const tmbillEnabled = isDev ? true : (process.env.ENABLE_TMBILL_PLUGIN === 'true');
+    
+    console.log('Plugin Status:', tmbillEnabled ? '✅ ENABLED' : '❌ DISABLED');
+    console.log('='.repeat(70) + '\n');
+    
+    if (tmbillEnabled) {
+      tmbillPlugin = new TMBillPlugin({
+        enabled: true,
+        serviceType: '_tmbill._tcp',
+        autoConnect: false,
+      });
+      
+      tmbillPlugin.initialize(mainWindow!);
+    }
+  });
+
+  
 
   if (!isDev && mainWindow) {
     setupAutoUpdater(mainWindow);

@@ -32,6 +32,7 @@ export interface Order {
   order_note?: string | null;
   delivery_instruction?: string | null;
   payment_method?: string;
+  payment_status?: string;
   processing_time?: string | null;
   
   // Delivery specific

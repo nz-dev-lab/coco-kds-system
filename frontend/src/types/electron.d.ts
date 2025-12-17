@@ -13,6 +13,16 @@ export interface PrintResult {
   success: boolean;
   error?: string;
 }
+
+export interface TMBillAPI {
+  getServices: () => Promise<any[]>;
+  startDiscovery: () => Promise<{ success: boolean }>;
+  stopDiscovery: () => Promise<{ success: boolean }>;
+  getState: () => Promise<any>;
+  getConfig: () => Promise<any>;
+  onServiceFound: (callback: (service: any) => void) => void;
+  onServiceLost: (callback: (name: string) => void) => void;
+}
 export interface ElectronAPI {
   // Window controls
   minimizeWindow: () => void;
@@ -50,6 +60,7 @@ export interface ElectronAPI {
 declare global {
   interface Window {
     electron: ElectronAPI;
+    tmbill: TMBillAPI;
   }
 }
 

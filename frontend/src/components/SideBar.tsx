@@ -50,6 +50,12 @@ const navigationItems: NavItem[] = [
     path: '/history',
   },
   {
+    id: 'tmbill-debug',
+    label: 'TMBill Debug',
+    icon: History,
+    path: '/tmbill-debug',
+  },
+  {
     id: 'settings',
     label: 'Settings',
     icon: Settings,

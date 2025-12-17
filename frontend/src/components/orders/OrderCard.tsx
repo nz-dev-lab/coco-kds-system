@@ -578,7 +578,7 @@ return (
                   text-xs font-semibold rounded 
                   flex items-center gap-1 
                   whitespace-nowrap
-                  ${order.payment_method === 'cash_on_delivery'
+                  ${order.payment_status === 'unpaid'
                     ? 'bg-amber-100 text-amber-800 border border-amber-300'
                     : 'bg-green-100 text-green-800 border border-green-300'
                   }
@@ -587,10 +587,10 @@ return (
                     text-[10px] font-semibold
                     hidden @[300px]:inline
                   ">
-                    {order.payment_method === 'cash_on_delivery' ? 'UNPAID' : 'PAID'}
+                    {order.payment_status === 'unpaid' ? 'UNPAID' : 'PAID'}
                   </span>
                   <span className="inline @[300px]:hidden text-[10px]">
-                    {order.payment_method === 'cash_on_delivery' ? 'COD' : 'PAID'}
+                    {order.payment_status === 'unpaid' ? 'COD' : 'PAID'}
                   </span>
                 </span>
               </div>
