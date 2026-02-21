@@ -140,7 +140,7 @@ function createWindow() {
     
     // For development: always enable
     // For production: check environment variable
-    const tmbillEnabled = isDev ? true : (process.env.ENABLE_TMBILL_PLUGIN === 'true');
+    const tmbillEnabled = true; // isDev || process.env.ENABLE_TMBILL_PLUGIN === 'true';
     
     console.log('Plugin Status:', tmbillEnabled ? '✅ ENABLED' : '❌ DISABLED');
     console.log('='.repeat(70) + '\n');
