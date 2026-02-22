@@ -148,7 +148,7 @@ function createWindow() {
     if (tmbillEnabled) {
       tmbillPlugin = new TMBillPlugin({
         enabled: true,
-        serviceType: '_tmbill._tcp',
+        serviceType: '_http._tcp',
         autoConnect: false,
       });
       
