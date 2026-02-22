@@ -50,6 +50,6 @@ jobs:
           tag_name: ${{ github.ref_name }}
           draft: false
           fail_on_unmatched_files: false
-          append_release_body: true
+          append_body: true
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
