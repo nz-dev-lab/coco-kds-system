@@ -470,6 +470,99 @@ export default function TMBillDebugPanel() {
             </div>
           )}
         </div>
+        {/* Manual IP Entry - If Discovery Fails */}
+{services.length === 0 && (
+  <div className="bg-gray-800 rounded-lg p-6 border-2 border-yellow-600">
+    <h2 className="text-xl font-bold mb-4 text-yellow-400">
+      ⚠️ Service Not Found - Manual Connection
+    </h2>
+    <p className="text-sm text-gray-400 mb-4">
+      If automatic discovery fails, you can manually enter the TMBILL POS IP address.
+    </p>
+    
+    <div className="space-y-3">
+      <div>
+        <label className="block text-sm text-gray-400 mb-2">
+          TMBILL POS IP Address:
+        </label>
+        <input
+          type="text"
+          placeholder="192.168.1.152"
+          className="w-full px-4 py-2 bg-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 outline-none"
+          id="manual-ip"
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm text-gray-400 mb-2">
+          Port (usually 3000):
+        </label>
+        <input
+          type="number"
+          placeholder="3000"
+          defaultValue="3000"
+          className="w-full px-4 py-2 bg-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 outline-none"
+          id="manual-port"
+        />
+      </div>
+      
+      <button
+        onClick={() => {
+          const ip = (document.getElementById('manual-ip') as HTMLInputElement).value;
+          const port = (document.getElementById('manual-port') as HTMLInputElement).value;
+          
+          if (!ip) {
+            addLog('❌ Please enter IP address');
+            return;
+          }
+          
+          addLog(`🔗 Adding manual service: ${ip}:${port}`);
+          
+          // Create a manual service object
+          const manualService: TMBillService = {
+            name: `TMBill POS (Manual) - ${ip}`,
+            host: ip,
+            port: parseInt(port) || 3000,
+            addresses: [ip],
+            type: '_http._tcp',
+            txt: {
+              url: `http://${ip}:${port}/`,
+              manual: 'true'
+            }
+          };
+          
+          // Add to services list
+          setServices([manualService]);
+          addLog(`✅ Manual service added: ${ip}:${port}`);
+          
+          captureData({
+            timestamp: new Date().toISOString(),
+            type: 'service',
+            data: {
+              event: 'manual-service-added',
+              service: manualService
+            }
+          });
+        }}
+        className="w-full px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium transition"
+      >
+        🔗 Add Manual Service
+      </button>
+    </div>
+    
+    <div className="mt-4 p-3 bg-blue-900/30 border-l-4 border-blue-500 rounded text-sm text-blue-200">
+      <strong>💡 How to find TMBILL POS IP:</strong>
+      <ol className="list-decimal ml-5 mt-2 space-y-1">
+        <li>Ask staff which computer runs TMBILL POS software</li>
+        <li>On that computer, open Command Prompt</li>
+        <li>Type: <code className="bg-black px-2 py-1 rounded">ipconfig</code></li>
+        <li>Look for "IPv4 Address" under WiFi adapter</li>
+        <li>Enter that IP here (e.g., 192.168.1.152)</li>
+        <li>Click "Add Manual Service"</li>
+      </ol>
+    </div>
+  </div>
+)}
 
         {/* Authentication Section */}
         {services.length > 0 && !isAuthenticated && (
