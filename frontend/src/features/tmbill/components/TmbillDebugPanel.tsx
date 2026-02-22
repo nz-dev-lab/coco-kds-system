@@ -1,14 +1,6 @@
-// src/features/tmbill/components/TMBillDebugPanel.tsx
 import { useEffect, useState } from 'react';
-
-interface TMBillService {
-  name: string;
-  host: string;
-  port: number;
-  addresses: string[];
-  type: string;
-  txt?: Record<string, any>;
-}
+import {TMBillService} from "../../../../electron/plugins/tmbill/types";
+import {CocoKDSOrder, CocoKDSOrderItem} from "../../../../electron/plugins/tmbill/transformer";
 
 interface CapturedData {
   timestamp: string;
@@ -22,6 +14,18 @@ export default function TMBillDebugPanel() {
   const [state, setState] = useState<any>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [capturedData, setCapturedData] = useState<CapturedData[]>([]);
+  
+  // Authentication
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [jwtToken, setJwtToken] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // Connection
+  const [isConnected, setIsConnected] = useState(false);
+  
+  // Orders - use the interface
+  const [orders, setOrders] = useState<CocoKDSOrder[]>([]);
 
   useEffect(() => {
     if (!window.tmbill) {
@@ -32,14 +36,12 @@ export default function TMBillDebugPanel() {
     addLog('🚀 Debug panel loaded');
     loadData();
 
-    // Listen for service discovery
-    window.tmbill.onServiceFound((service) => {
-      const timestamp = new Date().toISOString();
+    // ✅ Type annotations on all callbacks
+    window.tmbill.onServiceFound((service: TMBillService) => {
       addLog(`✅ Service found: ${service.name} (${service.host}:${service.port})`);
       
-      // Capture full service details
       captureData({
-        timestamp,
+        timestamp: new Date().toISOString(),
         type: 'service',
         data: {
           event: 'service-found',
@@ -54,10 +56,58 @@ export default function TMBillDebugPanel() {
       });
     });
 
-    window.tmbill.onServiceLost((name) => {
+    window.tmbill.onServiceLost((name: string) => {
       addLog(`❌ Service lost: ${name}`);
       setServices((prev) => prev.filter((s) => s.name !== name));
     });
+
+    // Listen for logs from plugin
+    if (window.tmbill.onLog) {
+      window.tmbill.onLog((data: { message: string; type?: string }) => {
+        addLog(data.message);
+      });
+    }
+
+    // Listen for orders
+    if (window.tmbill.onNewOrder) {
+      window.tmbill.onNewOrder((order: CocoKDSOrder) => {
+        addLog(`📦 New order received: ${order.order_number}`);
+        setOrders((prev) => [order, ...prev]);
+        
+        captureData({
+          timestamp: new Date().toISOString(),
+          type: 'event',
+          data: {
+            event: 'new-order',
+            order: order
+          }
+        });
+      });
+    }
+
+    if (window.tmbill.onOrderUpdated) {
+      window.tmbill.onOrderUpdated((order: CocoKDSOrder) => {
+        addLog(`🔄 Order updated: ${order.order_number}`);
+        setOrders((prev) => {
+          const index = prev.findIndex((o) => o.id === order.id);
+          if (index >= 0) {
+            const updated = [...prev];
+            updated[index] = order;
+            return updated;
+          }
+          return prev;
+        });
+        
+        captureData({
+          timestamp: new Date().toISOString(),
+          type: 'event',
+          data: {
+            event: 'order-updated',
+            order: order
+          }
+        });
+      });
+    }
 
     const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
@@ -74,6 +124,9 @@ export default function TMBillDebugPanel() {
       setServices(servicesData);
       setConfig(configData);
       setState(stateData);
+      setIsAuthenticated(stateData.authenticated);
+      setIsConnected(stateData.connected);
+      setJwtToken(stateData.token);
     } catch (error) {
       console.error('Failed to load data:', error);
       addLog(`❌ Error loading data: ${error}`);
@@ -106,6 +159,84 @@ export default function TMBillDebugPanel() {
     await loadData();
   };
 
+  const handleLogin = async () => {
+    if (!services[0]) {
+      addLog('❌ No TMBILL service found. Discover first.');
+      return;
+    }
+
+    const service = services[0];
+    addLog(`🔐 Authenticating with ${service.host}:${service.port}...`);
+
+    try {
+      const result = await window.tmbill.authenticate(service, username, password);
+
+      if (result.success && result.token) {
+        setJwtToken(result.token);
+        setIsAuthenticated(true);
+        addLog(`✅ Authentication successful!`);
+        addLog(`👤 User: ${username}`);
+        
+        captureData({
+          timestamp: new Date().toISOString(),
+          type: 'event',
+          data: {
+            event: 'login-success',
+            username: username,
+            storeDetails: result.storeDetails,
+          }
+        });
+        
+        await loadData();
+      } else {
+        addLog(`❌ Authentication failed: ${result.error}`);
+        captureData({
+          timestamp: new Date().toISOString(),
+          type: 'error',
+          data: {
+            event: 'login-failed',
+            error: result.error,
+          }
+        });
+      }
+    } catch (error: any) {
+      addLog(`❌ Login error: ${error.message}`);
+    }
+  };
+
+  const handleConnectSocket = async () => {
+    addLog('🔌 Connecting to Socket.IO...');
+    
+    try {
+      const result = await window.tmbill.connectSocket();
+      
+      if (result.success) {
+        setIsConnected(true);
+        addLog('✅ Socket.IO connected successfully!');
+        addLog('👂 Now listening for orders...');
+        await loadData();
+      } else {
+        addLog(`❌ Connection failed: ${result.error}`);
+      }
+    } catch (error: any) {
+      addLog(`❌ Connection error: ${error.message}`);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      await window.tmbill.disconnect();
+      setIsConnected(false);
+      setIsAuthenticated(false);
+      setJwtToken(null);
+      setOrders([]);
+      addLog('🔌 Disconnected from TMBILL POS');
+      await loadData();
+    } catch (error: any) {
+      addLog(`❌ Disconnect error: ${error.message}`);
+    }
+  };
+
   const exportCapturedData = () => {
     const dataStr = JSON.stringify(capturedData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -133,10 +264,7 @@ export default function TMBillDebugPanel() {
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-4 text-red-500">❌ TMBILL Plugin Not Available</h1>
           <p className="text-gray-400 mb-4">The TMBILL plugin is not enabled or loaded.</p>
-          <p className="text-sm text-gray-500">Check .env.development:</p>
-          <code className="block bg-black p-3 rounded mt-2 text-left">
-            VITE_ENABLE_TMBILL_PLUGIN=true
-          </code>
+          <p className="text-sm text-gray-500">Check electron/main.ts to enable the plugin.</p>
         </div>
       </div>
     );
@@ -152,12 +280,9 @@ export default function TMBillDebugPanel() {
           <p className="text-gray-400">
             On-Site Testing Mode - Captures all TMBILL service data for development
           </p>
-          <div className="mt-4 p-3 bg-yellow-900/30 border-l-4 border-yellow-500 rounded">
-            <p className="text-yellow-200 text-sm">
-              <strong>📝 Instructions:</strong> Connect to restaurant WiFi, ensure TMBILL POS is running, 
-              and this panel will automatically discover and log all service details.
-            </p>
-          </div>
+          <p className="text-sm text-gray-500 mt-2">
+            📝 Instructions: Connect to restaurant WiFi, ensure TMBILL POS is running, and this panel will automatically discover and log all service details.
+          </p>
         </div>
 
         {/* Config & State */}
@@ -194,20 +319,26 @@ export default function TMBillDebugPanel() {
               <div className="space-y-2 font-mono text-sm">
                 <div className="flex justify-between py-2 border-b border-gray-700">
                   <span className="text-gray-400">Initialized:</span>
-                  <span className={state.initialized ? 'text-green-500 font-bold' : 'text-red-500'}>
+                  <span className={state.initialized ? 'text-green-500 font-bold' : 'text-gray-500'}>
                     {state.initialized ? '✅ YES' : '❌ NO'}
                   </span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-700">
                   <span className="text-gray-400">Discovering:</span>
                   <span className={state.discovering ? 'text-yellow-500 font-bold' : 'text-gray-500'}>
-                    {state.discovering ? '🔍 ACTIVE' : '⏸️  PAUSED'}
+                    {state.discovering ? '🔍 ACTIVE' : '⏸️ PAUSED'}
+                  </span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-700">
+                  <span className="text-gray-400">Authenticated:</span>
+                  <span className={isAuthenticated ? 'text-green-500 font-bold' : 'text-gray-500'}>
+                    {isAuthenticated ? '✅ YES' : '❌ NO'}
                   </span>
                 </div>
                 <div className="flex justify-between py-2">
                   <span className="text-gray-400">Connected:</span>
-                  <span className={state.connected ? 'text-green-500 font-bold' : 'text-gray-500'}>
-                    {state.connected ? '✅ YES' : '❌ NO'}
+                  <span className={isConnected ? 'text-green-500 font-bold' : 'text-gray-500'}>
+                    {isConnected ? '✅ YES' : '❌ NO'}
                   </span>
                 </div>
               </div>
@@ -229,25 +360,33 @@ export default function TMBillDebugPanel() {
             </button>
             <button
               onClick={handleStartDiscovery}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition disabled:opacity-50"
               disabled={state?.discovering}
             >
               🔍 Start Discovery
             </button>
             <button
               onClick={handleStopDiscovery}
-              className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition disabled:opacity-50"
               disabled={!state?.discovering}
             >
               🛑 Stop Discovery
             </button>
             <button
               onClick={exportCapturedData}
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition"
+              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition disabled:opacity-50"
               disabled={capturedData.length === 0}
             >
               💾 Export Data ({capturedData.length})
             </button>
+            {isConnected && (
+              <button
+                onClick={handleDisconnect}
+                className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition"
+              >
+                🔌 Disconnect
+              </button>
+            )}
           </div>
         </div>
 
@@ -260,13 +399,12 @@ export default function TMBillDebugPanel() {
           {services.length === 0 ? (
             <div className="text-center py-12 border-2 border-dashed border-gray-700 rounded-lg">
               <p className="text-gray-400 text-lg mb-2">🔍 No services found yet...</p>
-              <p className="text-gray-500 text-sm mb-4">
+              <p className="text-gray-500 text-sm">
                 Searching for TMBILL POS on the network...
               </p>
-              <div className="text-xs text-gray-600">
-                <p>Looking for: {config?.serviceType}</p>
-                <p>Also trying: _http._tcp, _tcp, _printer._tcp</p>
-              </div>
+              <p className="text-gray-500 text-xs mt-2">
+                Looking for: {config?.serviceType || '_http._tcp'}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -279,18 +417,14 @@ export default function TMBillDebugPanel() {
                     <div className="flex-1">
                       <h3 className="font-bold text-xl text-green-400">{service.name}</h3>
                       <p className="text-sm text-gray-400">{service.type}</p>
+                      <p className="text-xs text-green-600 mt-1">✅ ACTIVE</p>
                     </div>
-                    <div className="flex gap-2">
-                      <span className="px-3 py-1 bg-green-600 rounded-full text-sm font-bold">
-                        ✅ ACTIVE
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(JSON.stringify(service, null, 2))}
-                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm"
-                      >
-                        📋 Copy
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => copyToClipboard(JSON.stringify(service, null, 2))}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition"
+                    >
+                      📋 Copy
+                    </button>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-3 font-mono text-sm bg-black/30 rounded p-3">
@@ -318,124 +452,235 @@ export default function TMBillDebugPanel() {
                   )}
                   
                   {service.txt && Object.keys(service.txt).length > 0 && (
-                    <div className="mt-3 font-mono text-sm">
-                      <span className="text-gray-400">TXT Records:</span>
-                      <pre className="ml-2 text-xs text-blue-400 mt-1 bg-black/50 p-2 rounded overflow-x-auto">
+                    <div className="mt-3">
+                      <span className="text-gray-400 text-sm">TXT Records:</span>
+                      <pre className="mt-1 bg-black/50 rounded p-2 text-xs overflow-x-auto">
                         {JSON.stringify(service.txt, null, 2)}
                       </pre>
                     </div>
                   )}
-
-                  <div className="mt-4 p-3 bg-yellow-900/30 border-l-4 border-yellow-500 rounded">
-                    <p className="text-yellow-200 text-sm">
-                      <strong>✅ TMBILL Service Found!</strong> Next step: Connect to this service 
-                      and capture order events. Connection URL: <code>http://{service.host}:{service.port}</code>
-                    </p>
-                  </div>
+                  
+                  {!isAuthenticated && (
+                    <div className="mt-3 p-2 bg-green-900/30 rounded text-sm text-green-300">
+                      ✅ TMBILL Service Found! Next step: Authenticate below to connect.
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Manual Connection (Fallback) */}
-{services.length === 0 && (
-  <div className="bg-gray-800 rounded-lg p-6 border-2 border-yellow-600">
-    <h2 className="text-xl font-bold mb-4 text-yellow-400">
-      ⚠️ Service Not Found - Manual Connection
-    </h2>
-    <p className="text-sm text-gray-400 mb-4">
-      If automatic discovery fails, you can manually enter the TMBILL POS IP address.
-    </p>
-    
-    <div className="space-y-3">
-      <div>
-        <label className="block text-sm text-gray-400 mb-2">
-          TMBILL POS IP Address:
-        </label>
-        <input
-          type="text"
-          placeholder="192.168.1.100"
-          className="w-full px-4 py-2 bg-gray-700 rounded text-white"
-          id="manual-ip"
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm text-gray-400 mb-2">
-          Port (usually 3000):
-        </label>
-        <input
-          type="number"
-          placeholder="3000"
-          defaultValue="3000"
-          className="w-full px-4 py-2 bg-gray-700 rounded text-white"
-          id="manual-port"
-        />
-      </div>
-      
-      <button
-        onClick={() => {
-          const ip = (document.getElementById('manual-ip') as HTMLInputElement).value;
-          const port = (document.getElementById('manual-port') as HTMLInputElement).value;
-          
-          if (!ip) {
-            addLog('❌ Please enter IP address');
-            return;
-          }
-          
-          const url = `http://${ip}:${port}`;
-          addLog(`🔗 Testing connection to: ${url}`);
-          
-          // Test if reachable
-          fetch(url, { mode: 'no-cors' })
-            .then(() => {
-              addLog(`✅ Connection successful!`);
-              addLog(`📋 URL: ${url}`);
-              copyToClipboard(url);
-            })
-            .catch(err => {
-              addLog(`❌ Connection failed: ${err.message}`);
-            });
-        }}
-        className="w-full px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium"
-      >
-        🔗 Test Connection
-      </button>
-    </div>
-    
-  </div>
-)}
+        {/* Authentication Section */}
+        {services.length > 0 && !isAuthenticated && (
+          <div className="bg-gray-800 rounded-lg p-6 border-2 border-yellow-600">
+            <h2 className="text-xl font-bold mb-4 text-yellow-400">
+              🔐 TMBILL Authentication
+            </h2>
+            <p className="text-sm text-gray-400 mb-4">
+              Enter TMBILL POS credentials to connect and receive orders
+            </p>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Username:
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="admin"
+                  className="w-full px-4 py-2 bg-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  onKeyPress={(e) => e.key === 'Enter' && password && handleLogin()}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Password:
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  className="w-full px-4 py-2 bg-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  onKeyPress={(e) => e.key === 'Enter' && username && handleLogin()}
+                />
+              </div>
+              
+              <button
+                onClick={handleLogin}
+                disabled={!username || !password}
+                className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                🔐 Login to TMBILL POS
+              </button>
+            </div>
+            
+            <div className="mt-4 p-3 bg-blue-900/30 border-l-4 border-blue-500 rounded text-sm text-blue-200">
+              <strong>💡 Where to get credentials:</strong>
+              <ul className="list-disc ml-5 mt-2 space-y-1">
+                <li>Ask restaurant staff for TMBILL login credentials</li>
+                <li>Same credentials they use for TMBILL KDS app</li>
+                <li>Usually: username = "admin" or "manager"</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {/* Authenticated - Connect Socket.IO */}
+        {isAuthenticated && !isConnected && (
+          <div className="bg-gray-800 rounded-lg p-6 border-2 border-green-600">
+            <h2 className="text-xl font-bold mb-4 text-green-400">
+              ✅ Authenticated Successfully
+            </h2>
+            <div className="space-y-2 text-sm mb-4">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Username:</span>
+                <span className="text-green-400 font-bold">{username}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Token:</span>
+                <span className="text-green-400 font-mono text-xs">
+                  {jwtToken?.substring(0, 20)}...
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Status:</span>
+                <span className="text-green-400 font-bold">Ready to Connect</span>
+              </div>
+            </div>
+            
+            <button
+              onClick={handleConnectSocket}
+              className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition"
+            >
+              🔌 Connect to Socket.IO & Start Receiving Orders
+            </button>
+          </div>
+        )}
+
+        {/* Connected - Receiving Orders */}
+        {isConnected && (
+          <div className="bg-gray-800 rounded-lg p-6 border-2 border-green-600">
+            <h2 className="text-xl font-bold mb-4 text-green-400">
+              🎉 Connected & Listening for Orders
+            </h2>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="font-medium">Receiving orders in real-time</span>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="bg-green-900/30 rounded p-3 text-center">
+                  <p className="text-2xl font-bold text-green-400">{orders.length}</p>
+                  <p className="text-gray-400 text-xs mt-1">Orders Received</p>
+                </div>
+                <div className="bg-blue-900/30 rounded p-3 text-center">
+                  <p className="text-2xl font-bold text-blue-400">{services[0]?.host}</p>
+                  <p className="text-gray-400 text-xs mt-1">POS Server</p>
+                </div>
+                <div className="bg-purple-900/30 rounded p-3 text-center">
+                  <p className="text-2xl font-bold text-purple-400">{username}</p>
+                  <p className="text-gray-400 text-xs mt-1">Connected As</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Orders Display */}
+        {orders.length > 0 && (
+          <div className="bg-gray-800 rounded-lg p-6">
+            <h2 className="text-xl font-bold mb-4">
+              📦 Received Orders ({orders.length})
+            </h2>
+            <div className="space-y-3 max-h-[600px] overflow-y-auto">
+              {orders.map((order, idx) => (
+                <div key={idx} className="bg-gray-700 rounded-lg p-4 border-l-4 border-green-500">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="font-bold text-lg text-green-400">{order.order_number}</h3>
+                      <p className="text-sm text-gray-400">
+                        {order.customer_name} {order.customer_phone && `• ${order.customer_phone}`}
+                      </p>
+                      {order.table_number && (
+                        <p className="text-xs text-blue-400 mt-1">
+                          🍽️ Table: {order.table_number}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-xl text-green-400">${order.total_amount}</p>
+                      <p className="text-xs px-2 py-1 bg-blue-600 rounded mt-1">{order.status}</p>
+                      <p className="text-xs text-gray-500 mt-1">{order.order_type}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-black/30 rounded p-3 mb-3">
+                    <p className="text-sm text-gray-400 mb-2 font-bold">Items ({order.items.length}):</p>
+                    <div className="space-y-1">
+                      {order.items.map((item: any, i: number) => (
+                        <div key={i} className="flex justify-between items-center text-sm py-1 border-b border-gray-600 last:border-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-blue-400 font-bold">{item.quantity}x</span>
+                            <span>{item.name}</span>
+                            {item.isReady && <span className="text-xs bg-green-600 px-2 py-0.5 rounded">✓ Ready</span>}
+                          </div>
+                          <span className="text-gray-400">${item.price}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 text-xs">
+                    <span className="text-gray-500">
+                      🕐 Created: {new Date(order.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                  
+                  <button
+                    onClick={() => copyToClipboard(JSON.stringify(order, null, 2))}
+                    className="mt-3 text-xs px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded transition"
+                  >
+                    📋 Copy Order JSON
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Captured Data */}
         {capturedData.length > 0 && (
           <div className="bg-gray-800 rounded-lg p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">📦 Captured Data ({capturedData.length})</h2>
               <button
                 onClick={() => setCapturedData([])}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-sm"
+                className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 rounded transition"
               >
                 🗑️ Clear
               </button>
             </div>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-2 max-h-64 overflow-y-auto">
               {capturedData.map((item, idx) => (
-                <div key={idx} className="bg-gray-700 rounded p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-gray-400">{item.timestamp}</span>
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${
-                      item.type === 'service' ? 'bg-green-600' :
-                      item.type === 'event' ? 'bg-blue-600' :
-                      'bg-red-600'
+                <details key={idx} className="bg-gray-700 rounded p-2 cursor-pointer">
+                  <summary className="font-mono text-xs">
+                    <span className="text-gray-400">{item.timestamp}</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                      item.type === 'service' ? 'bg-blue-600' :
+                      item.type === 'event' ? 'bg-green-600' : 'bg-red-600'
                     }`}>
                       {item.type.toUpperCase()}
                     </span>
-                  </div>
-                  <pre className="text-xs text-gray-300 bg-black/50 p-2 rounded overflow-x-auto">
+                  </summary>
+                  <pre className="mt-2 text-xs overflow-x-auto bg-black/50 rounded p-2">
                     {JSON.stringify(item.data, null, 2)}
                   </pre>
-                </div>
+                </details>
               ))}
             </div>
           </div>
@@ -444,18 +689,19 @@ export default function TMBillDebugPanel() {
         {/* Event Log */}
         <div className="bg-gray-800 rounded-lg p-6">
           <h2 className="text-xl font-bold mb-4">📝 Event Log</h2>
-          <div className="bg-black rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs">
+          <div className="bg-black rounded-lg p-4 h-80 overflow-y-auto font-mono text-xs space-y-1">
             {logs.length === 0 ? (
               <p className="text-gray-500">No events yet...</p>
             ) : (
               logs.map((log, idx) => (
-                <div key={idx} className="text-gray-300 mb-1 hover:bg-gray-900 px-2 py-1 rounded">
+                <div key={idx} className="text-gray-300 hover:bg-gray-800 px-2 py-1 rounded">
                   {log}
                 </div>
               ))
             )}
           </div>
         </div>
+
       </div>
     </div>
   );

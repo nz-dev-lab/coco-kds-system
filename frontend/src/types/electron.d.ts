@@ -14,15 +14,43 @@ export interface PrintResult {
   error?: string;
 }
 
-export interface TMBillAPI {
-  getServices: () => Promise<any[]>;
-  startDiscovery: () => Promise<{ success: boolean }>;
-  stopDiscovery: () => Promise<{ success: boolean }>;
-  getState: () => Promise<any>;
-  getConfig: () => Promise<any>;
-  onServiceFound: (callback: (service: any) => void) => void;
-  onServiceLost: (callback: (name: string) => void) => void;
-}
+contextBridge.exposeInMainWorld('tmbill', {
+  // Discovery (existing)
+  getServices: () => ipcRenderer.invoke('tmbill:get-services'),
+  startDiscovery: () => ipcRenderer.invoke('tmbill:start-discovery'),
+  stopDiscovery: () => ipcRenderer.invoke('tmbill:stop-discovery'),
+  getState: () => ipcRenderer.invoke('tmbill:get-state'),
+  getConfig: () => ipcRenderer.invoke('tmbill:get-config'),
+  
+  // NEW: Authentication & Connection
+  authenticate: (service: any, username: string, password: string) => 
+    ipcRenderer.invoke('tmbill:authenticate', service, username, password),
+  connectSocket: () => 
+    ipcRenderer.invoke('tmbill:connect-socket'),
+  disconnect: () => 
+    ipcRenderer.invoke('tmbill:disconnect'),
+  updateItemStatus: (kotItemId: number, status: string) => 
+    ipcRenderer.invoke('tmbill:update-item-status', kotItemId, status),
+  
+  // Events (existing)
+  onServiceFound: (callback: (service: any) => void) => {
+    ipcRenderer.on('tmbill:service-found', (_, service) => callback(service));
+  },
+  onServiceLost: (callback: (name: string) => void) => {
+    ipcRenderer.on('tmbill:service-lost', (_, name) => callback(name));
+  },
+  
+  // NEW: Order events
+  onNewOrder: (callback: (order: any) => void) => {
+    ipcRenderer.on('tmbill:new-order', (_, order) => callback(order));
+  },
+  onOrderUpdated: (callback: (order: any) => void) => {
+    ipcRenderer.on('tmbill:order-updated', (_, order) => callback(order));
+  },
+  onLog: (callback: (data: { message: string; type?: string }) => void) => {
+    ipcRenderer.on('tmbill:log', (_, data) => callback(data));
+  },
+});
 export interface ElectronAPI {
   // Window controls
   minimizeWindow: () => void;

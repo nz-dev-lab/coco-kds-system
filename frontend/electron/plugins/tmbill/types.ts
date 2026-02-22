@@ -1,4 +1,3 @@
-// electron/plugins/tmbill/types.ts
 export interface TMBillService {
   name: string;
   host: string;
@@ -18,6 +17,8 @@ export interface TMBillPluginState {
   initialized: boolean;
   discovering: boolean;
   connected: boolean;
+  authenticated: boolean; // NEW
   service: TMBillService | null;
+  token: string | null; // NEW
   lastError: string | null;
 }
