@@ -338,6 +338,75 @@ export default function TMBillDebugPanel() {
           )}
         </div>
 
+        {/* Manual Connection (Fallback) */}
+{services.length === 0 && (
+  <div className="bg-gray-800 rounded-lg p-6 border-2 border-yellow-600">
+    <h2 className="text-xl font-bold mb-4 text-yellow-400">
+      ⚠️ Service Not Found - Manual Connection
+    </h2>
+    <p className="text-sm text-gray-400 mb-4">
+      If automatic discovery fails, you can manually enter the TMBILL POS IP address.
+    </p>
+    
+    <div className="space-y-3">
+      <div>
+        <label className="block text-sm text-gray-400 mb-2">
+          TMBILL POS IP Address:
+        </label>
+        <input
+          type="text"
+          placeholder="192.168.1.100"
+          className="w-full px-4 py-2 bg-gray-700 rounded text-white"
+          id="manual-ip"
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm text-gray-400 mb-2">
+          Port (usually 3000):
+        </label>
+        <input
+          type="number"
+          placeholder="3000"
+          defaultValue="3000"
+          className="w-full px-4 py-2 bg-gray-700 rounded text-white"
+          id="manual-port"
+        />
+      </div>
+      
+      <button
+        onClick={() => {
+          const ip = (document.getElementById('manual-ip') as HTMLInputElement).value;
+          const port = (document.getElementById('manual-port') as HTMLInputElement).value;
+          
+          if (!ip) {
+            addLog('❌ Please enter IP address');
+            return;
+          }
+          
+          const url = `http://${ip}:${port}`;
+          addLog(`🔗 Testing connection to: ${url}`);
+          
+          // Test if reachable
+          fetch(url, { mode: 'no-cors' })
+            .then(() => {
+              addLog(`✅ Connection successful!`);
+              addLog(`📋 URL: ${url}`);
+              copyToClipboard(url);
+            })
+            .catch(err => {
+              addLog(`❌ Connection failed: ${err.message}`);
+            });
+        }}
+        className="w-full px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium"
+      >
+        🔗 Test Connection
+      </button>
+    </div>
+    
+  </div>
+)}
+
         {/* Captured Data */}
         {capturedData.length > 0 && (
           <div className="bg-gray-800 rounded-lg p-6">
