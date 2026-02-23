@@ -24,8 +24,13 @@ export default function TMBillDebugPanel() {
   // Connection
   const [isConnected, setIsConnected] = useState(false);
   
-  // Orders - use the interface
+  // Orders
   const [orders, setOrders] = useState<CocoKDSOrder[]>([]);
+  
+  // Manual IP entry
+  const [manualIP, setManualIP] = useState('');
+  const [manualPort, setManualPort] = useState('3000');
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   useEffect(() => {
     if (!window.tmbill) {
@@ -36,7 +41,7 @@ export default function TMBillDebugPanel() {
     addLog('🚀 Debug panel loaded');
     loadData();
 
-    // ✅ Type annotations on all callbacks
+    // Listen for service discovery
     window.tmbill.onServiceFound((service: TMBillService) => {
       addLog(`✅ Service found: ${service.name} (${service.host}:${service.port})`);
       
@@ -157,6 +162,108 @@ export default function TMBillDebugPanel() {
     addLog('🛑 Stopping discovery...');
     await window.tmbill.stopDiscovery();
     await loadData();
+  };
+
+  const handleManualConnect = async () => {
+    if (!manualIP) {
+      addLog('❌ Please enter IP address');
+      return;
+    }
+    
+    // Validate IP format
+    const ipPattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = manualIP.match(ipPattern);
+    
+    if (!match) {
+      addLog('❌ Invalid IP format. Example: 192.168.1.152');
+      return;
+    }
+    
+    // Check each octet is 0-255
+    const octets = match.slice(1, 5).map(Number);
+    if (octets.some(octet => octet > 255 || octet < 0)) {
+      addLog('❌ Invalid IP: Each number must be between 0-255');
+      addLog(`❌ Your IP has: ${octets.join('.')} - check the numbers!`);
+      return;
+    }
+    
+    setIsTestingConnection(true);
+    addLog(`🔍 Testing connection to ${manualIP}:${manualPort}...`);
+    
+    // Test the connection
+    try {
+      const testUrl = `http://${manualIP}:${manualPort}/`;
+      
+      // Try to fetch with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        mode: 'no-cors', // Important for CORS
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      addLog(`✅ Connection test passed: ${manualIP}:${manualPort} is reachable`);
+      
+      // Create manual service
+      const manualService: TMBillService = {
+        name: `TMBill POS (Manual) - ${manualIP}`,
+        host: manualIP,
+        port: parseInt(manualPort) || 3000,
+        addresses: [manualIP],
+        type: '_http._tcp',
+        txt: {
+          url: testUrl,
+          manual: 'true'
+        }
+      };
+      
+      // Add to services list and force re-render
+      setServices([manualService]);
+      addLog(`✅ Manual service added: ${manualIP}:${manualPort}`);
+      addLog(`✅ Authentication section should appear below`);
+      
+      captureData({
+        timestamp: new Date().toISOString(),
+        type: 'service',
+        data: {
+          event: 'manual-service-added',
+          service: manualService,
+          connectionTest: 'passed'
+        }
+      });
+      
+    } catch (error: any) {
+      addLog(`❌ Connection test FAILED: ${manualIP}:${manualPort}`);
+      
+      if (error.name === 'AbortError') {
+        addLog(`❌ Connection timeout - server didn't respond in 5 seconds`);
+      } else {
+        addLog(`❌ Error: ${error.message}`);
+      }
+      
+      addLog(`❌ Please check:`);
+      addLog(`   1. IP address is correct`);
+      addLog(`   2. TMBILL POS is running on that computer`);
+      addLog(`   3. Port 3000 is open (not blocked by firewall)`);
+      addLog(`   4. Both computers are on same network`);
+      
+      captureData({
+        timestamp: new Date().toISOString(),
+        type: 'error',
+        data: {
+          event: 'manual-service-test-failed',
+          ip: manualIP,
+          port: manualPort,
+          error: error.message
+        }
+      });
+    } finally {
+      setIsTestingConnection(false);
+    }
   };
 
   const handleLogin = async () => {
@@ -408,9 +515,9 @@ export default function TMBillDebugPanel() {
             </div>
           ) : (
             <div className="space-y-3">
-              {services.map((service) => (
+              {services.map((service, idx) => (
                 <div
-                  key={service.name}
+                  key={idx}
                   className="bg-gradient-to-r from-green-900/20 to-green-800/20 rounded-lg p-4 border-2 border-green-500"
                 >
                   <div className="flex items-start justify-between mb-3">
@@ -418,6 +525,9 @@ export default function TMBillDebugPanel() {
                       <h3 className="font-bold text-xl text-green-400">{service.name}</h3>
                       <p className="text-sm text-gray-400">{service.type}</p>
                       <p className="text-xs text-green-600 mt-1">✅ ACTIVE</p>
+                      {service.txt?.manual && (
+                        <p className="text-xs text-yellow-500 mt-1">⚠️ MANUALLY ADDED</p>
+                      )}
                     </div>
                     <button
                       onClick={() => copyToClipboard(JSON.stringify(service, null, 2))}
@@ -459,112 +569,75 @@ export default function TMBillDebugPanel() {
                       </pre>
                     </div>
                   )}
-                  
-                  {!isAuthenticated && (
-                    <div className="mt-3 p-2 bg-green-900/30 rounded text-sm text-green-300">
-                      ✅ TMBILL Service Found! Next step: Authenticate below to connect.
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
-        {/* Manual IP Entry - If Discovery Fails */}
-{services.length === 0 && (
-  <div className="bg-gray-800 rounded-lg p-6 border-2 border-yellow-600">
-    <h2 className="text-xl font-bold mb-4 text-yellow-400">
-      ⚠️ Service Not Found - Manual Connection
-    </h2>
-    <p className="text-sm text-gray-400 mb-4">
-      If automatic discovery fails, you can manually enter the TMBILL POS IP address.
-    </p>
-    
-    <div className="space-y-3">
-      <div>
-        <label className="block text-sm text-gray-400 mb-2">
-          TMBILL POS IP Address:
-        </label>
-        <input
-          type="text"
-          placeholder="192.168.1.152"
-          className="w-full px-4 py-2 bg-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 outline-none"
-          id="manual-ip"
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm text-gray-400 mb-2">
-          Port (usually 3000):
-        </label>
-        <input
-          type="number"
-          placeholder="3000"
-          defaultValue="3000"
-          className="w-full px-4 py-2 bg-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 outline-none"
-          id="manual-port"
-        />
-      </div>
-      
-      <button
-        onClick={() => {
-          const ip = (document.getElementById('manual-ip') as HTMLInputElement).value;
-          const port = (document.getElementById('manual-port') as HTMLInputElement).value;
-          
-          if (!ip) {
-            addLog('❌ Please enter IP address');
-            return;
-          }
-          
-          addLog(`🔗 Adding manual service: ${ip}:${port}`);
-          
-          // Create a manual service object
-          const manualService: TMBillService = {
-            name: `TMBill POS (Manual) - ${ip}`,
-            host: ip,
-            port: parseInt(port) || 3000,
-            addresses: [ip],
-            type: '_http._tcp',
-            txt: {
-              url: `http://${ip}:${port}/`,
-              manual: 'true'
-            }
-          };
-          
-          // Add to services list
-          setServices([manualService]);
-          addLog(`✅ Manual service added: ${ip}:${port}`);
-          
-          captureData({
-            timestamp: new Date().toISOString(),
-            type: 'service',
-            data: {
-              event: 'manual-service-added',
-              service: manualService
-            }
-          });
-        }}
-        className="w-full px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium transition"
-      >
-        🔗 Add Manual Service
-      </button>
-    </div>
-    
-    <div className="mt-4 p-3 bg-blue-900/30 border-l-4 border-blue-500 rounded text-sm text-blue-200">
-      <strong>💡 How to find TMBILL POS IP:</strong>
-      <ol className="list-decimal ml-5 mt-2 space-y-1">
-        <li>Ask staff which computer runs TMBILL POS software</li>
-        <li>On that computer, open Command Prompt</li>
-        <li>Type: <code className="bg-black px-2 py-1 rounded">ipconfig</code></li>
-        <li>Look for "IPv4 Address" under WiFi adapter</li>
-        <li>Enter that IP here (e.g., 192.168.1.152)</li>
-        <li>Click "Add Manual Service"</li>
-      </ol>
-    </div>
-  </div>
-)}
 
-        {/* Authentication Section */}
+        {/* Manual IP Entry - Show when no services found */}
+        {services.length === 0 && (
+          <div className="bg-gray-800 rounded-lg p-6 border-2 border-yellow-600">
+            <h2 className="text-xl font-bold mb-4 text-yellow-400">
+              ⚠️ Service Not Found - Manual Connection
+            </h2>
+            <p className="text-sm text-gray-400 mb-4">
+              If automatic discovery fails, you can manually enter the TMBILL POS IP address and test the connection.
+            </p>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  TMBILL POS IP Address:
+                </label>
+                <input
+                  type="text"
+                  value={manualIP}
+                  onChange={(e) => setManualIP(e.target.value)}
+                  placeholder="192.168.1.152"
+                  className="w-full px-4 py-2 bg-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  disabled={isTestingConnection}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Port (usually 3000):
+                </label>
+                <input
+                  type="number"
+                  value={manualPort}
+                  onChange={(e) => setManualPort(e.target.value)}
+                  placeholder="3000"
+                  className="w-full px-4 py-2 bg-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  disabled={isTestingConnection}
+                />
+              </div>
+              
+              <button
+                onClick={handleManualConnect}
+                disabled={isTestingConnection || !manualIP}
+                className="w-full px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isTestingConnection ? '🔍 Testing Connection...' : '🔗 Test & Add Manual Service'}
+              </button>
+            </div>
+            
+            <div className="mt-4 p-3 bg-blue-900/30 border-l-4 border-blue-500 rounded text-sm text-blue-200">
+              <strong>💡 How to find TMBILL POS IP:</strong>
+              <ol className="list-decimal ml-5 mt-2 space-y-1">
+                <li>Ask staff which computer runs TMBILL POS software</li>
+                <li>On that computer, open Command Prompt</li>
+                <li>Type: <code className="bg-black px-2 py-1 rounded">ipconfig</code></li>
+                <li>Look for "IPv4 Address" under WiFi or Ethernet adapter</li>
+                <li>Enter that IP here (e.g., 192.168.1.152)</li>
+                <li>Click "Test & Add Manual Service" - it will verify the connection first</li>
+              </ol>
+            </div>
+          </div>
+        )}
+
+        {/* Authentication Section - Shows when service is available */}
         {services.length > 0 && !isAuthenticated && (
           <div className="bg-gray-800 rounded-lg p-6 border-2 border-yellow-600">
             <h2 className="text-xl font-bold mb-4 text-yellow-400">
