@@ -114,8 +114,8 @@ export default function TMBillDebugPanel() {
       });
     }
 
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
+    // const interval = setInterval(loadData, 5000);
+    // return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
@@ -278,7 +278,7 @@ export default function TMBillDebugPanel() {
     try {
       const result = await window.tmbill.authenticate(service, username, password);
 
-      if (result.success && result.token) {
+      if (result.success) {
         setJwtToken(result.token);
         setIsAuthenticated(true);
         addLog(`✅ Authentication successful!`);

@@ -17,8 +17,10 @@ export interface TMBillPluginState {
   initialized: boolean;
   discovering: boolean;
   connected: boolean;
-  authenticated: boolean; // NEW
+  authenticated: boolean;
   service: TMBillService | null;
-  token: string | null; // NEW
+  token: string | null;
+  storeId: string | null;    // ← NEW: needed for /kds/runningtables calls
+  baseUrl: string | null;   // ← NEW: stored after auth so connection.ts can fetch
   lastError: string | null;
 }

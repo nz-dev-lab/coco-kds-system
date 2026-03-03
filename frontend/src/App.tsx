@@ -12,6 +12,7 @@ import UpdateManager from './components/UpdateManager';
 import Foods from './pages/Foods';
 import Notifications from './pages/Notifications';
 import TMBillDebugPanel from './features/tmbill/components/TmbillDebugPanel';
+import { useTmbillOrders } from './hooks/useTmbillOrders';
 
 // Temporary placeholder components
 const OrdersPage = () => (
@@ -41,6 +42,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
+  useTmbillOrders(); // Hook to manage TMBILL orders and keep Redux store in sync
 
   return (
     <>

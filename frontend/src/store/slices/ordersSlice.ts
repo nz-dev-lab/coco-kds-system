@@ -2,13 +2,18 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { Order } from '@/types/order.type';
+import { CocoKDSOrder } from 'electron/plugins/tmbill/transformer';
+import { DisplayOrder } from '@/types/display-order.type';
 
 interface OrdersState {
   orders: Order[];
   loading: boolean;
   error: string | null;
   lastFetch: number | null;
-  newOrderIds: string[];  // ✅ Already added
+  newOrderIds: string[];
+   // ── TMBILL ──────────────────────────────
+  tmbillRunningOrders: CocoKDSOrder[];   // from tables[] — normal KOTs
+  tmbillSettledOrders: any[];            // from settledOrders[] — quick bills
 }
 
 const initialState: OrdersState = {
@@ -16,7 +21,9 @@ const initialState: OrdersState = {
   loading: false,
   error: null,
   lastFetch: null,
-  newOrderIds: [],  // ✅ Already added
+  newOrderIds: [],
+  tmbillRunningOrders: [],
+  tmbillSettledOrders: [],
 };
 
 // Fetch orders
@@ -151,6 +158,32 @@ const ordersSlice = createSlice({
     markOrderAsViewed: (state, action: PayloadAction<string>) => {
       state.newOrderIds = state.newOrderIds.filter(id => id !== action.payload);
     },
+    // ── TMBILL: Full refresh from tmbill:orders-refreshed event ──────────────────
+// Fires on: kot-saved, kds-kot-updated, quick-bill-placed, post-removal refetch
+// Replaces ALL tmbill orders — CocoEats orders (state.orders) untouched
+setTmbillOrders: (
+  state,
+  action: PayloadAction<{ running: CocoKDSOrder[]; settled: any[] }>
+) => {
+  state.tmbillRunningOrders = action.payload.running;
+  state.tmbillSettledOrders = action.payload.settled;
+},
+
+// ── TMBILL: Remove running order by id (websocket-kot-cancelled) ─────────────
+// Payload: { id: 'TMBILL-55270' }
+removeTmbillOrder: (state, action: PayloadAction<{ id: string }>) => {
+  state.tmbillRunningOrders = state.tmbillRunningOrders.filter(
+    o => o.id !== action.payload.id
+  );
+},
+
+// ── TMBILL: Remove running order by tableId (bill-settled) ───────────────────
+// bill-settled only gives table_id — match against _tmbill_table_id
+removeTmbillOrderByTableId: (state, action: PayloadAction<{ tableId: number }>) => {
+  state.tmbillRunningOrders = state.tmbillRunningOrders.filter(
+    o => o._tmbill_table_id !== action.payload.tableId
+  );
+},
   },
   extraReducers: (builder) => {
     builder
@@ -298,7 +331,26 @@ export const {
   addOrder, 
   updateOrder, 
   toggleItemReady,
-  markOrderAsViewed  // ✅ ADD: Export the new action
+  markOrderAsViewed,
+  setTmbillOrders,
+  removeTmbillOrder,
+  removeTmbillOrderByTableId,
 } = ordersSlice.actions;
+// Selectors for TMBILL orders
+export const selectTmbillRunningOrders = (state: { orders: OrdersState }) =>
+  state.orders.tmbillRunningOrders;
+
+export const selectTmbillSettledOrders = (state: { orders: OrdersState }) =>
+  state.orders.tmbillSettledOrders;
+
+// Combined selector — all active orders from both sources
+// export const selectAllActiveOrders = (state: { orders: OrdersState }) => [
+//   ...state.orders.orders,               // CocoEats orders
+//   ...state.orders.tmbillRunningOrders,  // TMBILL KOTs
+// ];
+export const selectAllActiveOrders = (state: { orders: OrdersState }): DisplayOrder[] => [
+  ...state.orders.orders.map(o => ({ ...o, _source: 'cocoeats' as const })),
+  ...state.orders.tmbillRunningOrders,
+];
 
 export default ordersSlice.reducer;
