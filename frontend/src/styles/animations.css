@@ -58,3 +58,13 @@
 .animation-fade-out {
   animation: fadeOut 0.5s ease-out forwards;
 }
+
+/* CocoEats source icon — blink every 3 seconds */
+@keyframes cocoeatsBlink {
+  0%, 85%, 100% { opacity: 1; }
+  90%, 95%      { opacity: 0; }
+}
+
+.cocoeats-icon-blink {
+  animation: cocoeatsBlink 3s ease-in-out infinite;
+}

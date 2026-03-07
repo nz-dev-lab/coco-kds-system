@@ -1,20 +1,41 @@
 // src/pages/Login.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { login } from '../store/slices/authSlice';
 import TopBarLogin from '../components/TopBarLogin';
 
+const STORAGE_KEY = 'coco_kds_saved_credentials';
+
 export default function Login() {
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((state) => state.auth);
-  
+
   const [credentials, setCredentials] = useState({
     email: '',
     password: '',
   });
+  const [rememberMe, setRememberMe] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const { email, password } = JSON.parse(saved);
+        setCredentials({ email, password });
+        setRememberMe(true);
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (rememberMe) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(credentials));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
     await dispatch(login(credentials));
   };
 
@@ -88,6 +109,22 @@ export default function Login() {
                 placeholder="Enter your password"
                 required
               />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 dark:border-kds-border accent-blue-500 cursor-pointer"
+              />
+              <label
+                htmlFor="rememberMe"
+                className="text-sm text-slate-600 dark:text-kds-text-secondary cursor-pointer select-none"
+              >
+                Remember me
+              </label>
             </div>
 
             <button

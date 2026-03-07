@@ -1,21 +1,14 @@
 // components/TopBar.tsx
 import { Menu, ChevronDown, ChevronUp, Bell, User, LogOut } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { toggleSidebar, toggleNavbar, setSelectedStation } from '../store/slices/uiSlice';
+import { toggleSidebar, toggleNavbar, setSelectedSource } from '../store/slices/uiSlice';
 import { logout } from '../store/slices/authSlice';
 import WindowControls from './WindowControls';
 import ThemeToggle from './ThemeToggle';
 
-const stations = [
-  'Main Kitchen',
-  'Grill Station',
-  'Dessert Station',
-  'Bar',
-];
-
 export default function TopBar() {
   const dispatch = useAppDispatch();
-  const { navbarOpen, selectedStation } = useAppSelector((state) => state.ui);
+  const { navbarOpen, selectedSource } = useAppSelector((state) => state.ui);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -29,8 +22,8 @@ export default function TopBar() {
     dispatch(toggleNavbar());
   };
 
-  const handleStationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    dispatch(setSelectedStation(e.target.value));
+  const handleSourceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    dispatch(setSelectedSource(e.target.value as 'all' | 'cocoeats' | 'tmbill'));
   };
 
   return (
@@ -58,17 +51,15 @@ export default function TopBar() {
 
           {/* Center section */}
           <div className="flex items-center gap-2 px-6" style={{ WebkitAppRegion: 'no-drag' } as any}>
-            <span className="text-sm text-slate-600 dark:text-kds-text-muted">Station:</span>
+            <span className="text-sm text-slate-600 dark:text-kds-text-muted">Source:</span>
             <select
-              value={selectedStation}
-              onChange={handleStationChange}
+              value={selectedSource}
+              onChange={handleSourceChange}
               className="py-1 px-3 text-sm rounded-lg bg-slate-100 dark:bg-kds-surface border border-slate-300 dark:border-kds-border text-slate-900 dark:text-kds-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
-              {stations.map((station) => (
-                <option key={station} value={station}>
-                  {station}
-                </option>
-              ))}
+              <option value="all">All Orders</option>
+              <option value="cocoeats">CocoEats</option>
+              <option value="tmbill">TMBILL POS</option>
             </select>
           </div>
 

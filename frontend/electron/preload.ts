@@ -86,6 +86,10 @@ contextBridge.exposeInMainWorld('tmbill', {
   fetchRunningTables: () =>
     ipcRenderer.invoke('tmbill:fetch-running-tables'),
 
+  // LAN scan — finds TMBILL POS by probing port 3000 across subnet
+  scanNetwork: (port?: number) =>
+    ipcRenderer.invoke('tmbill:scan-network', port ?? 3000),
+
   // Item status — isReady: true → ready, false → pending
   updateItemStatus: (kotItemId: number, isReady: boolean) =>
     ipcRenderer.invoke('tmbill:update-item-status', kotItemId, isReady),

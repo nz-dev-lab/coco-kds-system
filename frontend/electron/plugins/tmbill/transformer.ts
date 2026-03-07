@@ -321,7 +321,7 @@ export function transformTMBillSettledOrder(order: TMBillSettledOrder): CocoKDSO
     order_age_minutes: order.created_time
       ? Math.floor((Date.now() - order.created_time) / 60000)
       : 0,
-    created_at: order.created_time ? order.created_time.toString() : new Date().toISOString(),
+    created_at: order.created_time ? new Date(order.created_time).toISOString() : new Date().toISOString(),
     updated_at: new Date().toISOString(),
     _source: 'tmbill',
     _tmbill_kot_id: 0,                   // no kot_id for quick bills

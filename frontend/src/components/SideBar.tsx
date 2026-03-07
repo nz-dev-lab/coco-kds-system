@@ -1,7 +1,7 @@
 // components/Sidebar.tsx
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, ClipboardList, Settings, ChevronLeft, ChevronRight, History, Truck, Utensils, BellRing } from 'lucide-react';
+import { Home, ClipboardList, Settings, ChevronLeft, ChevronRight, History, Truck, Utensils, BellRing, HelpCircle } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { toggleSidebar } from '../store/slices/uiSlice';
 
@@ -54,6 +54,12 @@ const navigationItems: NavItem[] = [
     label: 'TMBill Debug',
     icon: History,
     path: '/tmbill-debug',
+  },
+  {
+    id: 'help',
+    label: 'Help & Guide',
+    icon: HelpCircle,
+    path: '/help',
   },
   {
     id: 'settings',

@@ -39,6 +39,8 @@ export class TMBillConnection {
   private assignedKitchedeps: string | null = null;
   private logCallback: LogCallback | null = null;
   private tmposId: string | null = null;
+  private reconnectCallback: (() => void) | null = null;
+  private hasConnectedOnce = false;
 
   constructor(logCallback?: LogCallback) {
     this.logCallback = logCallback || null;
@@ -158,7 +160,13 @@ export class TMBillConnection {
     });
 
     this.socket.on('connect', () => {
-      this.log('✅ Connected to TMBILL POS Socket.IO', 'success');
+      if (!this.hasConnectedOnce) {
+        this.hasConnectedOnce = true;
+        this.log('✅ Connected to TMBILL POS Socket.IO', 'success');
+      } else {
+        this.log('🔄 Reconnected to TMBILL POS — re-syncing orders...', 'info');
+        this.reconnectCallback?.();
+      }
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -250,13 +258,17 @@ export class TMBillConnection {
     });
   }
 
+  onReconnected(callback: () => void) {
+    this.reconnectCallback = callback;
+  }
+
   /**
    * Listen for order removal events.
    *
-   * bill-settled: table_id known → renderer matches by _tmbill_table_id
+   * bill-settled: table_id known (running table) or order_id only (quick bill)
    * websocket-kot-cancelled: exact kot_id known → renderer removes by id
    */
-  onOrderRemoved(callback: (kotId: number | null, tableId: number | null) => void) {
+  onOrderRemoved(callback: (kotId: number | null, tableId: number | null, orderId: string | null) => void) {
     if (!this.socket) throw new Error('Not connected');
 
     this.log('👂 Listening for order removal events...', 'info');
@@ -267,8 +279,8 @@ export class TMBillConnection {
         : rawData;
 
       this.log(`💳 Bill settled — table_id: ${data.table_id}, order_id: ${data.order_id}`, 'info');
-      // Pass table_id so index.ts can match by _tmbill_table_id
-      callback(null, data.table_id || null);
+      // Quick bills have order_id but no table_id; running tables have table_id
+      callback(null, data.table_id ?? null, data.order_id?.toString() ?? null);
     });
 
     this.socket.on('websocket-kot-cancelled', (rawData: any) => {
@@ -277,7 +289,7 @@ export class TMBillConnection {
         : rawData;
 
       this.log(`🚫 Order cancelled: KOT ${data.kot_id} — removing from KDS`, 'info');
-      callback(data.kot_id, null);
+      callback(data.kot_id, null, null);
     });
   }
 

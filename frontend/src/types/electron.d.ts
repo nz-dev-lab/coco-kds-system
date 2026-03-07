@@ -53,6 +53,7 @@ export interface TMBillAPI {
   connectSocket: () => Promise<{ success: boolean; connected: boolean }>;
   disconnect: () => Promise<{ success: boolean }>;
   fetchRunningTables: () => Promise<{ success: boolean; count: number; settledCount: number }>;
+  scanNetwork: (port?: number) => Promise<{ found: boolean; host: string | null }>;
   updateItemStatus: (kotItemId: number, isReady: boolean) => Promise<{ success: boolean }>;
   updateKotStatus: (kotId: number, tableId: number, tableName: string, status: number) => Promise<{ success: boolean }>;
   updateOrderKotStatus: (orderId: string, status: number) => Promise<{ success: boolean }>;

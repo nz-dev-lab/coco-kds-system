@@ -43,12 +43,15 @@ export default function TMBillDebugPanel() {
     const saved = localStorage.getItem('tmbill_credentials');
     if (saved) {
       try {
-        const { service, username: u, password: p } = JSON.parse(saved);
-        setUsername(u || '');
-        setPassword(p || '');
-        if (service?.host) setManualIP(service.host);
-        if (service?.port) setManualPort(String(service.port));
-        addLog(`💾 Saved credentials loaded for ${u}@${service?.host}`);
+        const p = JSON.parse(saved);
+        // Support both old { service } and new flat { host, port, username, password } format
+        const host = p.host || p.service?.host;
+        const port = p.port || p.service?.port;
+        setUsername(p.username || '');
+        setPassword(p.password || '');
+        if (host) setManualIP(host);
+        if (port) setManualPort(String(port));
+        addLog(`💾 Saved credentials loaded for ${p.username}@${host}`);
       } catch {}
     }
     loadData();
@@ -254,6 +257,15 @@ export default function TMBillDebugPanel() {
         setIsAuthenticated(true);
         addLog(`✅ Authentication successful!`);
         addLog(`👤 User: ${username}`);
+        // Save credentials immediately after auth so auto-connect/scan works on next launch
+        // even if the user doesn't complete the socket connection step
+        localStorage.setItem('tmbill_credentials', JSON.stringify({
+          host: service.host,
+          port: service.port,
+          username,
+          password,
+        }));
+        addLog(`💾 Credentials saved for ${username}@${service.host}`);
         
         captureData({
           timestamp: new Date().toISOString(),
@@ -292,9 +304,10 @@ export default function TMBillDebugPanel() {
         setIsConnected(true);
         addLog('✅ Socket.IO connected successfully!');
         addLog('👂 Now listening for orders...');
-        // Persist credentials so app auto-connects on next launch
+        // Persist credentials in flat format so auto-connect + scan work on next launch
         localStorage.setItem('tmbill_credentials', JSON.stringify({
-          service: services[0],
+          host: services[0].host,
+          port: services[0].port,
           username,
           password,
         }));

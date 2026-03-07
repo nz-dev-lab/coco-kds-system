@@ -1,9 +1,10 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import { TMBillDiscovery } from './discovery';
 import { TMBillConnection } from './connections';
-import { 
+import { scanForTmbill } from './network-scan';
+import {
   transformTMBillRunningTable,
-  transformItemStatusToTmbill 
+  transformItemStatusToTmbill
 } from './transformer';
 import type { TMBillPluginConfig, TMBillPluginState, TMBillService } from './types';
 import type { TMBillRunningTable } from './transformer';
@@ -153,26 +154,31 @@ export class TMBillPlugin {
         });
 
         // ── ORDER REMOVED (bill-settled / cancelled) ──────────────────────
-        this.connection.onOrderRemoved(async (kotId, tableId) => {
+        this.connection.onOrderRemoved(async (kotId, tableId, orderId) => {
           if (kotId !== null) {
             // websocket-kot-cancelled — exact kot_id known
             this.log(`🚫 Order removed: TMBILL-${kotId}`, 'info');
             this.sendToRenderer('tmbill:order-removed', { id: `TMBILL-${kotId}` });
-
-            // Re-fetch to sync state after cancellation
-            const { tables, settledOrders } = await this.connection.fetchRunningTables();
-            const transformedOrders = tables.map(t => transformTMBillRunningTable(t));
-            this.sendToRenderer('tmbill:orders-refreshed', { running: transformedOrders, settled: settledOrders });
           } else if (tableId !== null) {
-            // bill-settled — only table_id known; renderer matches by _tmbill_table_id
+            // bill-settled for a running table — match by _tmbill_table_id
             this.log(`💳 Order settled for table_id: ${tableId}`, 'info');
             this.sendToRenderer('tmbill:order-settled', { tableId });
-
-            // Re-fetch to sync settledOrders after bill settlement
-            const { tables, settledOrders } = await this.connection.fetchRunningTables();
-            const transformedOrders = tables.map(t => transformTMBillRunningTable(t));
-            this.sendToRenderer('tmbill:orders-refreshed', { running: transformedOrders, settled: settledOrders });
+          } else if (orderId !== null) {
+            // bill-settled for a quick bill — only order_id present
+            this.log(`💳 Quick bill settled: ${orderId}`, 'info');
           }
+
+          // Re-fetch after any removal to sync the full order list
+          const { tables, settledOrders } = await this.connection.fetchRunningTables();
+          const transformedOrders = tables.map(t => transformTMBillRunningTable(t));
+          this.sendToRenderer('tmbill:orders-refreshed', { running: transformedOrders, settled: settledOrders });
+        });
+
+        // ── RECONNECT (re-sync missed orders after socket drop) ────────────
+        this.connection.onReconnected(async () => {
+          const { tables, settledOrders } = await this.connection.fetchRunningTables();
+          const transformedOrders = tables.map(t => transformTMBillRunningTable(t));
+          this.sendToRenderer('tmbill:orders-refreshed', { running: transformedOrders, settled: settledOrders });
         });
 
         this.state.connected = true;
@@ -244,6 +250,18 @@ export class TMBillPlugin {
         this.log(`❌ Order KOT status update failed: ${error.message}`, 'error');
         return { success: false, error: error.message };
       }
+    });
+
+    // ── Network Scan ──────────────────────────────────────────────────────
+    ipcMain.handle('tmbill:scan-network', async (_event, port: number = 3000) => {
+      this.log(`🔍 Scanning LAN for TMBILL POS on port ${port}...`, 'info');
+      const host = await scanForTmbill(port);
+      if (host) {
+        this.log(`✅ Found TMBILL POS at ${host}:${port}`, 'success');
+      } else {
+        this.log(`❌ No TMBILL POS found on network`, 'error');
+      }
+      return { found: !!host, host: host ?? null };
     });
 
     // ── Disconnect ────────────────────────────────────────────────────────

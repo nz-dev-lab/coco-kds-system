@@ -5,6 +5,7 @@ interface UIState {
   sidebarOpen: boolean;
   navbarOpen: boolean;
   selectedStation: string;
+  selectedSource: 'all' | 'cocoeats' | 'tmbill';
   theme: 'dark' | 'light';
   settings: {
     audioNotifications: {
@@ -162,6 +163,7 @@ const initialState: UIState = {
   sidebarOpen: true,
   navbarOpen: true,
   selectedStation: 'Main Kitchen',
+  selectedSource: 'all',
   theme: 'dark',
   settings: loadSettings(),
   focusedOrderId: null,
@@ -197,6 +199,9 @@ const uiSlice = createSlice({
     // ========================================
     setSelectedStation: (state, action: PayloadAction<string>) => {
       state.selectedStation = action.payload;
+    },
+    setSelectedSource: (state, action: PayloadAction<'all' | 'cocoeats' | 'tmbill'>) => {
+      state.selectedSource = action.payload;
     },
     toggleTheme: (state) => {
       state.theme = state.theme === 'dark' ? 'light' : 'dark';
@@ -312,6 +317,7 @@ export const {
   toggleNavbar,
   setNavbarOpen,
   setSelectedStation,
+  setSelectedSource,
   toggleTheme,
   setTheme,
   setFocusedOrder,

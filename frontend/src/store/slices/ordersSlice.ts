@@ -7,6 +7,7 @@ import { DisplayOrder } from '@/types/display-order.type';
 
 interface OrdersState {
   orders: Order[];
+  cocoeatsBumpedOrders: Order[];       // bumped (hidden) CocoEats orders — retrievable via recall
   loading: boolean;
   error: string | null;
   lastFetch: number | null;
@@ -14,16 +15,21 @@ interface OrdersState {
    // ── TMBILL ──────────────────────────────
   tmbillRunningOrders: CocoKDSOrder[];   // from tables[] — normal KOTs
   tmbillSettledOrders: CocoKDSOrder[];   // from settledOrders[] — quick bills (pre-transformed)
+  tmbillBumpedOrders: CocoKDSOrder[];    // bumped (hidden) orders — retrievable via recall
+  tmbillConnected: boolean;              // true after successful socket connection
 }
 
 const initialState: OrdersState = {
   orders: [],
+  cocoeatsBumpedOrders: [],
   loading: false,
   error: null,
   lastFetch: null,
   newOrderIds: [],
   tmbillRunningOrders: [],
   tmbillSettledOrders: [],
+  tmbillBumpedOrders: [],
+  tmbillConnected: false,
 };
 
 // Fetch orders
@@ -165,24 +171,82 @@ setTmbillOrders: (
   state,
   action: PayloadAction<{ running: CocoKDSOrder[]; settled: any[] }>
 ) => {
-  state.tmbillRunningOrders = action.payload.running;
-  state.tmbillSettledOrders = action.payload.settled.map(transformTMBillSettledOrder);
+  const bumpedIds = new Set(state.tmbillBumpedOrders.map(o => o.id));
+  state.tmbillRunningOrders = action.payload.running.filter(o => !bumpedIds.has(o.id));
+  const runningIds = new Set(state.tmbillRunningOrders.map(o => o.id));
+  state.tmbillSettledOrders = action.payload.settled
+    .map(transformTMBillSettledOrder)
+    .filter(o => !bumpedIds.has(o.id) && !runningIds.has(o.id));
 },
 
 // ── TMBILL: Remove running order by id (websocket-kot-cancelled) ─────────────
 // Payload: { id: 'TMBILL-55270' }
 removeTmbillOrder: (state, action: PayloadAction<{ id: string }>) => {
-  state.tmbillRunningOrders = state.tmbillRunningOrders.filter(
-    o => o.id !== action.payload.id
-  );
+  state.tmbillRunningOrders = state.tmbillRunningOrders.filter(o => o.id !== action.payload.id);
+  state.tmbillBumpedOrders = state.tmbillBumpedOrders.filter(o => o.id !== action.payload.id);
 },
 
 // ── TMBILL: Remove running order by tableId (bill-settled) ───────────────────
 // bill-settled only gives table_id — match against _tmbill_table_id
 removeTmbillOrderByTableId: (state, action: PayloadAction<{ tableId: number }>) => {
-  state.tmbillRunningOrders = state.tmbillRunningOrders.filter(
-    o => o._tmbill_table_id !== action.payload.tableId
-  );
+  state.tmbillRunningOrders = state.tmbillRunningOrders.filter(o => o._tmbill_table_id !== action.payload.tableId);
+  state.tmbillBumpedOrders = state.tmbillBumpedOrders.filter(o => o._tmbill_table_id !== action.payload.tableId);
+},
+
+// ── TMBILL: Connection state ──────────────────────────────────────────────────
+setTmbillConnected: (state, action: PayloadAction<boolean>) => {
+  state.tmbillConnected = action.payload;
+},
+
+// ── TMBILL: Bump — hide order from dashboard, move to bumped list ─────────────
+// No status sent to POS. Order's current status is preserved.
+// Quick bills (from settledOrders) and table KOTs (from runningOrders) both supported.
+bumpTmbillOrder: (state, action: PayloadAction<{ id: string }>) => {
+  const runningIdx = state.tmbillRunningOrders.findIndex(o => o.id === action.payload.id);
+  if (runningIdx !== -1) {
+    const [order] = state.tmbillRunningOrders.splice(runningIdx, 1);
+    (order as any)._bumped_from = 'running';
+    state.tmbillBumpedOrders.unshift(order);
+    return;
+  }
+  const settledIdx = state.tmbillSettledOrders.findIndex(o => o.id === action.payload.id);
+  if (settledIdx !== -1) {
+    const [order] = state.tmbillSettledOrders.splice(settledIdx, 1);
+    (order as any)._bumped_from = 'settled';
+    state.tmbillBumpedOrders.unshift(order);
+  }
+},
+
+// ── TMBILL: Recall — move bumped order back to active dashboard ───────────────
+// Restores to the original list (running or settled) it came from.
+recallTmbillOrder: (state, action: PayloadAction<{ id: string }>) => {
+  const idx = state.tmbillBumpedOrders.findIndex(o => o.id === action.payload.id);
+  if (idx !== -1) {
+    const [order] = state.tmbillBumpedOrders.splice(idx, 1);
+    if ((order as any)._bumped_from === 'settled') {
+      state.tmbillSettledOrders.unshift(order);
+    } else {
+      state.tmbillRunningOrders.unshift(order);
+    }
+  }
+},
+
+// ── CocoEats: Bump — hide order from dashboard, move to bumped list ──────────
+bumpCocoeatsOrder: (state, action: PayloadAction<{ id: string }>) => {
+  const idx = state.orders.findIndex(o => o.id === action.payload.id);
+  if (idx !== -1) {
+    const [order] = state.orders.splice(idx, 1);
+    state.cocoeatsBumpedOrders.unshift(order);
+  }
+},
+
+// ── CocoEats: Recall — move bumped order back to active dashboard ─────────────
+recallCocoeatsOrder: (state, action: PayloadAction<{ id: string }>) => {
+  const idx = state.cocoeatsBumpedOrders.findIndex(o => o.id === action.payload.id);
+  if (idx !== -1) {
+    const [order] = state.cocoeatsBumpedOrders.splice(idx, 1);
+    state.orders.unshift(order);
+  }
 },
 
 // Item ready toggle for TMBILL (local UI only — IPC call handled separately)
@@ -208,10 +272,11 @@ toggleTmbillItemReady(
       })
       .addCase(fetchOrders.fulfilled, (state, action) => {
         state.loading = false;
-        state.orders = action.payload;
+        // Filter out locally bumped orders so they don't pop back on refresh
+        const bumpedIds = new Set(state.cocoeatsBumpedOrders.map((o: Order) => o.id));
+        state.orders = action.payload.filter((o: Order) => !bumpedIds.has(o.id));
         state.lastFetch = Date.now();
-        // ✅ IMPORTANT: Don't mark fetched orders as new (they already existed)
-        // Only WebSocket 'order:new' events should add to newOrderIds
+        // Don't mark fetched orders as new — only WebSocket 'order:new' events should
       })
       .addCase(fetchOrders.rejected, (state, action) => {
         state.loading = false;
@@ -341,22 +406,36 @@ toggleTmbillItemReady(
   },
 });
 
-export const { 
-  addOrder, 
-  updateOrder, 
+export const {
+  addOrder,
+  updateOrder,
   toggleItemReady,
   markOrderAsViewed,
   setTmbillOrders,
   removeTmbillOrder,
   removeTmbillOrderByTableId,
-  toggleTmbillItemReady
+  toggleTmbillItemReady,
+  setTmbillConnected,
+  bumpTmbillOrder,
+  recallTmbillOrder,
+  bumpCocoeatsOrder,
+  recallCocoeatsOrder,
 } = ordersSlice.actions;
 // Selectors for TMBILL orders
+export const selectTmbillConnected = (state: { orders: OrdersState }) =>
+  state.orders.tmbillConnected;
+
 export const selectTmbillRunningOrders = (state: { orders: OrdersState }) =>
   state.orders.tmbillRunningOrders;
 
 export const selectTmbillSettledOrders = (state: { orders: OrdersState }) =>
   state.orders.tmbillSettledOrders;
+
+export const selectTmbillBumpedOrders = (state: { orders: OrdersState }) =>
+  state.orders.tmbillBumpedOrders;
+
+export const selectCocoeatsBumpedOrders = (state: { orders: OrdersState }) =>
+  state.orders.cocoeatsBumpedOrders;
 
 // Combined selector — all active orders from both sources
 // export const selectAllActiveOrders = (state: { orders: OrdersState }) => [

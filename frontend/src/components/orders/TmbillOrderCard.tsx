@@ -3,9 +3,9 @@
 // Excluded: print, delivery modal, scheduled logic, CocoEats-specific fields.
 // Status progression calls window.tmbill IPC instead of CocoEats API.
 
-import { Bike, CookingPot, ShoppingBag, User } from 'lucide-react';
+import { Bike, Check, CookingPot, RectangleEllipsis, ShoppingBag, Store, User, Zap } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { toggleTmbillItemReady, removeTmbillOrder, markOrderAsViewed } from '../../store/slices/ordersSlice';
+import { toggleTmbillItemReady, bumpTmbillOrder, recallTmbillOrder, markOrderAsViewed } from '../../store/slices/ordersSlice';
 import { useCallback, useEffect, useState } from 'react';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { CocoKDSOrder } from '../../../electron/plugins/tmbill/transformer';
@@ -14,9 +14,10 @@ import { setFocusedOrder, addRecentlyUpdated, releaseFocus, removeRecentlyUpdate
 interface TmbillOrderCardProps {
   order: CocoKDSOrder;
   gridPosition: number;
+  isBumped?: boolean;
 }
 
-export default function TmbillOrderCard({ order, gridPosition }: TmbillOrderCardProps) {
+export default function TmbillOrderCard({ order, gridPosition, isBumped = false }: TmbillOrderCardProps) {
   const dispatch = useAppDispatch();
   const currentTime = useCurrentTime();
 
@@ -31,6 +32,7 @@ export default function TmbillOrderCard({ order, gridPosition }: TmbillOrderCard
   const isHeaderMode      = processingMode === 'header';
 
   const [showAnimation, setShowAnimation] = useState(isNewOrder);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const items = order.items || [];
 
@@ -107,7 +109,10 @@ export default function TmbillOrderCard({ order, gridPosition }: TmbillOrderCard
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('.order-card-hook') && isFocused) dispatch(releaseFocus());
+      if (!target.closest('.order-card-hook')) {
+        if (isFocused) dispatch(releaseFocus());
+        setMenuOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -164,7 +169,7 @@ export default function TmbillOrderCard({ order, gridPosition }: TmbillOrderCard
           break;
         case 'ready':
           await window.tmbill.updateOrderKotStatus(order._tmbill_order_id, 1);
-          dispatch(removeTmbillOrder({ id: order.id }));
+          dispatch(bumpTmbillOrder({ id: order.id }));
           break;
         default:
           dispatch(releaseFocus());
@@ -184,7 +189,7 @@ export default function TmbillOrderCard({ order, gridPosition }: TmbillOrderCard
           break;
         case 'ready':
           await window.tmbill.updateKotStatus(order._tmbill_kot_id, order._tmbill_table_id, order._tmbill_table_name, 5);
-          dispatch(removeTmbillOrder({ id: order.id }));
+          dispatch(bumpTmbillOrder({ id: order.id }));
           break;
         default:
           dispatch(releaseFocus());
@@ -206,6 +211,51 @@ export default function TmbillOrderCard({ order, gridPosition }: TmbillOrderCard
     stopAnimation();
     await advanceKotStatus('ready');
   }, [stopAnimation, advanceKotStatus]);
+
+  // Jump directly to any status from the ellipsis menu
+  const jumpToStatus = useCallback(async (target: 'processing' | 'ready' | 'complete') => {
+    setMenuOpen(false);
+    stopAnimation();
+
+    if (target === 'complete') {
+      // Bump: local hide only — no status sent to POS, order state on POS preserved
+      dispatch(bumpTmbillOrder({ id: order.id }));
+      return;
+    }
+
+    dispatch(setFocusedOrder({ orderId: order.id, position: gridPosition }));
+
+    if (isOrderKot) {
+      // BILL_STATES_BYFLAG: 4=Preparing, 5=Ready
+      const code = target === 'processing' ? 4 : 5;
+      await window.tmbill.updateOrderKotStatus(order._tmbill_order_id, code);
+    } else {
+      // KOT_STATES_BYFLAG: 3=Preparing, 4=Ready
+      const code = target === 'processing' ? 3 : 4;
+      await window.tmbill.updateKotStatus(order._tmbill_kot_id, order._tmbill_table_id, order._tmbill_table_name, code);
+    }
+
+    dispatch(addRecentlyUpdated(order.id));
+    setTimeout(() => dispatch(releaseFocus()), 15000);
+  }, [isOrderKot, order, gridPosition, stopAnimation, dispatch]);
+
+  // Mark as Served — sends Served status to POS without hiding from dashboard
+  // Table KOTs: status 5 (KOT_STATES_BYFLAG), Order KOTs: status 1 (BILL_STATES_BYFLAG)
+  const handleMarkServed = useCallback(async () => {
+    setMenuOpen(false);
+    stopAnimation();
+    if (isOrderKot) {
+      await window.tmbill.updateOrderKotStatus(order._tmbill_order_id, 1);
+    } else {
+      await window.tmbill.updateKotStatus(order._tmbill_kot_id, order._tmbill_table_id, order._tmbill_table_name, 5);
+    }
+    dispatch(addRecentlyUpdated(order.id));
+  }, [isOrderKot, order, stopAnimation, dispatch]);
+
+  // Recall a bumped order back to the active dashboard
+  const handleRecall = useCallback(() => {
+    dispatch(recallTmbillOrder({ id: order.id }));
+  }, [order.id, dispatch]);
 
   // ── Header double-tap (mirrors useHeaderDoubleTap logic for TMBILL) ───────
   const handleHeaderDoubleTap = useCallback(async () => {
@@ -244,6 +294,7 @@ export default function TmbillOrderCard({ order, gridPosition }: TmbillOrderCard
         min-w-[280px]
         max-w-[550px]
         w-full
+        ${isBumped ? 'opacity-60 grayscale-[30%]' : ''}
         ${showAnimation ? 'new-order-animation' : ''}
         ${isFocused ? 'ring-4 ring-blue-500 ring-opacity-50' : ''}
         ${isRecentlyUpdated ? 'animate-pulse-border' : ''}
@@ -270,14 +321,16 @@ export default function TmbillOrderCard({ order, gridPosition }: TmbillOrderCard
               ">
                 {config.text}
               </span>
-              <span className={`
-                px-1.5 sm:px-2 py-0.5
-                ${sourceBadge.bg} text-white
-                text-[10px] sm:text-xs
-                font-semibold rounded
-                whitespace-nowrap flex-shrink-0
-              `}>
-                {sourceBadge.text}
+              {isBumped && (
+                <span className="px-1.5 py-0.5 bg-slate-700 text-white text-[10px] font-bold rounded uppercase whitespace-nowrap flex-shrink-0">
+                  BUMPED
+                </span>
+              )}
+              <span
+                className={`p-1 ${sourceBadge.bg} rounded flex-shrink-0`}
+                title={sourceBadge.text}
+              >
+                <Store className="w-3.5 h-3.5 text-white" />
               </span>
             </div>
 
@@ -348,9 +401,10 @@ export default function TmbillOrderCard({ order, gridPosition }: TmbillOrderCard
                   {order.order_type.replace('_', ' ')}
                 </span>
                 <span className="inline @[350px]:hidden">
-                  {order.order_type === 'delivery'  ? <Bike        className="w-4 h-4 text-slate-700" /> :
-                   order.order_type === 'takeaway'  ? <ShoppingBag className="w-4 h-4 text-slate-700" /> :
-                                                      <CookingPot  className="w-4 h-4 text-slate-700" />}
+                  {order.order_type === 'delivery'   ? <Bike        className="w-4 h-4 text-slate-700" /> :
+                   order.order_type === 'takeaway'   ? <ShoppingBag className="w-4 h-4 text-slate-700" /> :
+                   order.order_type === 'quick_bill' ? <Zap         className="w-4 h-4 text-amber-600" /> :
+                                                       <CookingPot  className="w-4 h-4 text-slate-700" />}
                 </span>
               </span>
             </div>
@@ -412,42 +466,133 @@ export default function TmbillOrderCard({ order, gridPosition }: TmbillOrderCard
         {/* Fixed Bottom Action Buttons — same structure as OrderCard */}
         <div className="p-4 pt-0 border-t border-slate-100 flex-shrink-0 mt-auto">
 
-          {/* Button mode — same for all order types including quick bill */}
-          {processingMode === 'buttons' && (
+          {isBumped ? (
+            /* Bumped state — show Recall button only */
+            <button
+              onClick={handleRecall}
+              className="w-full py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-semibold rounded-lg transition-colors"
+            >
+              Recall to Dashboard
+            </button>
+          ) : (
             <>
-              {order.status === 'pending' && (
-                <button
-                  {...actionTriggerProps(handleStartCooking)}
-                  className="w-full py-2.5 mb-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-                >
-                  Start Cooking
-                </button>
+              {/* Button mode — same for all order types including quick bill */}
+              {processingMode === 'buttons' && (
+                <>
+                  {order.status === 'pending' && (
+                    <button
+                      {...actionTriggerProps(handleStartCooking)}
+                      className="w-full py-2.5 mb-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                    >
+                      Start Cooking
+                    </button>
+                  )}
+                  {order.status === 'processing' && (
+                    <button
+                      {...actionTriggerProps(handleMarkReady)}
+                      className="w-full py-2.5 mb-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-colors"
+                    >
+                      Mark as Ready
+                    </button>
+                  )}
+                  {order.status === 'ready' && (
+                    <button
+                      {...actionTriggerProps(handleComplete)}
+                      className="w-full py-2.5 mb-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                    >
+                      Complete Order
+                    </button>
+                  )}
+                </>
               )}
-              {order.status === 'processing' && (
+
+              {/* Bottom bar — centered ellipsis menu */}
+              <div className="relative">
                 <button
-                  {...actionTriggerProps(handleMarkReady)}
-                  className="w-full py-2.5 mb-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-colors"
+                  onClick={() => setMenuOpen((v) => !v)}
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg flex items-center justify-center transition-colors"
+                  title="Order actions"
                 >
-                  Mark as Ready
+                  <RectangleEllipsis className="w-6 h-6" />
                 </button>
-              )}
-              {order.status === 'ready' && (
-                <button
-                  {...actionTriggerProps(handleComplete)}
-                  className="w-full py-2.5 mb-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
-                >
-                  Complete Order
-                </button>
-              )}
+
+                {/* Dropdown — opens above the bar */}
+                {menuOpen && (
+                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                    {/* Start Cooking */}
+                    {(() => {
+                      const isPast    = order.status === 'processing' || order.status === 'ready';
+                      const isCurrent = order.status === 'processing';
+                      return (
+                        <button
+                          onClick={() => !isPast && jumpToStatus('processing')}
+                          disabled={isPast}
+                          className={`w-full px-4 py-2.5 flex items-center gap-3 text-sm text-left transition-colors
+                            ${isPast    ? 'text-slate-400 cursor-default' : ''}
+                            ${isCurrent ? 'bg-orange-50 text-orange-700 font-semibold' : ''}
+                            ${!isPast && !isCurrent ? 'hover:bg-slate-50 text-slate-700' : ''}
+                          `}
+                        >
+                          {isPast
+                            ? <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                            : <span className="w-4 h-4 rounded-full border-2 border-current flex-shrink-0" />
+                          }
+                          Start Cooking
+                        </button>
+                      );
+                    })()}
+
+                    <div className="border-t border-slate-100" />
+
+                    {/* Mark as Ready */}
+                    {(() => {
+                      const isPast    = order.status === 'ready';
+                      const isCurrent = order.status === 'ready';
+                      return (
+                        <button
+                          onClick={() => !isPast && jumpToStatus('ready')}
+                          disabled={isPast}
+                          className={`w-full px-4 py-2.5 flex items-center gap-3 text-sm text-left transition-colors
+                            ${isPast    ? 'text-slate-400 cursor-default' : ''}
+                            ${isCurrent ? 'bg-green-50 text-green-700 font-semibold' : ''}
+                            ${!isPast && !isCurrent ? 'hover:bg-slate-50 text-slate-700' : ''}
+                          `}
+                        >
+                          {isPast
+                            ? <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                            : <span className="w-4 h-4 rounded-full border-2 border-current flex-shrink-0" />
+                          }
+                          Mark as Ready
+                        </button>
+                      );
+                    })()}
+
+                    <div className="border-t border-slate-100" />
+
+                    {/* Mark as Served — sends Served to POS, stays on dashboard */}
+                    <button
+                      onClick={handleMarkServed}
+                      className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-left hover:bg-slate-50 text-slate-700 transition-colors"
+                    >
+                      <Check className="w-4 h-4 flex-shrink-0 text-green-600" />
+                      Mark as Served
+                    </button>
+
+                    <div className="border-t border-slate-100" />
+
+                    {/* Bump — local hide only, no status sent to POS */}
+                    <button
+                      onClick={() => jumpToStatus('complete')}
+                      className="w-full px-4 py-2.5 flex items-center gap-3 text-sm font-semibold text-left bg-slate-800 hover:bg-slate-900 text-white transition-colors"
+                    >
+                      <Store className="w-4 h-4 flex-shrink-0" />
+                      Bump Order
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
-
-          {/* Bottom bar — replaces Print/Assign row with POS source indicator */}
-          <div className="flex gap-2">
-            <div className="w-full py-2 bg-slate-100 text-slate-500 rounded-lg flex items-center justify-center gap-2 text-xs font-medium select-none">
-              POS Order
-            </div>
-          </div>
         </div>
       </div>
     </>

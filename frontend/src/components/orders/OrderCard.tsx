@@ -1,7 +1,8 @@
 // src/components/orders/OrderCard.tsx
-import { User, Printer, AlertCircle, Bike, CalendarClock, ShoppingBag, CookingPot } from 'lucide-react';
+import { User, Printer, AlertCircle, Bike, CalendarClock, ShoppingBag, CookingPot, RectangleEllipsis } from 'lucide-react';
+import CocoEatsIcon from '../icons/CocoEatsIcon';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { toggleItemReady, updateOrderStatus } from '../../store/slices/ordersSlice';
+import { toggleItemReady, updateOrderStatus, bumpCocoeatsOrder, recallCocoeatsOrder } from '../../store/slices/ordersSlice';
 import DeliveryDetailsModal from './DeliveryDetailsModal';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getScheduledInfo, formatCountdown } from '../../utils/scheduledOrderUtils';
@@ -61,13 +62,15 @@ import { setFocusedOrder, addRecentlyUpdated, releaseFocus, removeRecentlyUpdate
 
 interface OrderCardProps {
   order: Order;
-  gridPosition: number;  // New prop for grid position
+  gridPosition: number;
+  isBumped?: boolean;
 }
 
-export default function OrderCard({ order, gridPosition }: OrderCardProps) {
+export default function OrderCard({ order, gridPosition, isBumped = false }: OrderCardProps) {
   const dispatch = useAppDispatch();
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const currentTime = useCurrentTime();
   const { printWithSelection, isPrinting } = usePrintOrder();
 
@@ -120,22 +123,22 @@ const orderAge = order.created_at
   // Status color mapping (matching prototype)
   const statusConfig = {
     pending: {
-      bg: 'bg-[#3B82F6]', // Blue
+      bg: 'bg-[#3B82F6]',
       text: 'Pending',
     },
     confirmed: {
-      bg: 'bg-teal-600', // Amber
+      bg: 'bg-teal-600',
       text: 'Confirmed',
     },
     processing: {
-      bg: 'bg-[#F97316]', // Orange
+      bg: 'bg-[#F97316]',
       text: 'Processing',
     },
     handover: {
-      bg: 'bg-[#10B981]', // Green
+      bg: 'bg-[#10B981]',
       text: 'Ready',
     },
-      picked_up: {  // ✨ ADD THIS
+    picked_up: {
       bg: 'bg-purple-500',
       text: 'Out for Delivery',
     },
@@ -219,6 +222,15 @@ const handleBump = useCallback(async () => {
 
    dispatch(addRecentlyUpdated(order.id));
 }, [bumpOrder, order, orderAge, dispatch]);
+
+const handleBumpLocal = useCallback(() => {
+  setMenuOpen(false);
+  dispatch(bumpCocoeatsOrder({ id: order.id }));
+}, [dispatch, order.id]);
+
+const handleRecall = useCallback(() => {
+  dispatch(recallCocoeatsOrder({ id: order.id }));
+}, [dispatch, order.id]);
 
  const handleAssignDelivery = () => {
   setShowAssignModal(true);
@@ -427,6 +439,7 @@ return (
       min-w-[280px]
       max-w-[550px]
       w-full
+      ${isBumped ? 'opacity-60 grayscale-[30%]' : ''}
       ${showAnimation ? 'new-order-animation' : ''}
       ${isFocused ? 'ring-4 ring-blue-500 ring-opacity-50' : ''}
       ${isRecentlyUpdated ? 'animate-pulse-border' : ''}
@@ -443,19 +456,29 @@ return (
             <span className="text-white font-bold text-base sm:text-lg font-mono flex-shrink-0">
               #{order.id}
             </span>
-            
+
             {/* Status Badge */}
             <span className="
-              px-1.5 sm:px-2 py-0.5 
-              bg-white/20 text-white 
-              text-[10px] sm:text-xs 
-              font-semibold rounded 
+              px-1.5 sm:px-2 py-0.5
+              bg-white/20 text-white
+              text-[10px] sm:text-xs
+              font-semibold rounded
               whitespace-nowrap
               flex-shrink-0
             ">
               {config.text}
             </span>
-            
+
+            {/* Source Badge — CocoEats online order indicator */}
+            <CocoEatsIcon className="w-5 h-5 text-white flex-shrink-0 cocoeats-icon-blink" />
+
+            {/* Bumped badge */}
+            {isBumped && (
+              <span className="px-1.5 py-0.5 bg-slate-700 text-white text-[10px] font-bold rounded uppercase whitespace-nowrap flex-shrink-0">
+                BUMPED
+              </span>
+            )}
+
             {/* Scheduled Badge */}
             {scheduledInfo.isScheduled && (
               <span className="
@@ -474,7 +497,7 @@ return (
             )}
           </div>
 
-          {/* Right side: Time */}
+          {/* Right side: Time + Source icon */}
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {scheduledInfo.isScheduled ? (
               <span className="text-white text-[10px] sm:text-xs font-semibold whitespace-nowrap">
@@ -578,19 +601,19 @@ return (
                   text-xs font-semibold rounded 
                   flex items-center gap-1 
                   whitespace-nowrap
-                  ${order.payment_status === 'unpaid'
-                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                    : 'bg-green-100 text-green-800 border border-green-300'
+                  ${order.payment_status === 'paid'
+                    ? 'bg-green-100 text-green-800 border border-green-300'
+                    : 'bg-amber-100 text-amber-800 border border-amber-300'
                   }
                 `}>
                   <span className="
                     text-[10px] font-semibold
                     hidden @[300px]:inline
                   ">
-                    {order.payment_status === 'unpaid' ? 'UNPAID' : 'PAID'}
+                    {order.payment_status === 'paid' ? 'PAID' : 'UNPAID'}
                   </span>
                   <span className="inline @[300px]:hidden text-[10px]">
-                    {order.payment_status === 'unpaid' ? 'COD' : 'PAID'}
+                    {order.payment_status === 'paid' ? 'PAID' : 'COD'}
                   </span>
                 </span>
               </div>
@@ -701,6 +724,16 @@ return (
 
       {/* Fixed Bottom Action Buttons */}
       <div className="p-4 pt-0 border-t border-slate-100 flex-shrink-0 mt-auto">
+        {isBumped ? (
+          /* Bumped state — show Recall button only */
+          <button
+            onClick={handleRecall}
+            className="w-full py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-semibold rounded-lg transition-colors"
+          >
+            Recall to Dashboard
+          </button>
+        ) : (
+        <>
         {processingMode === 'buttons' && (
           <>
           {/* Confirm Order */}
@@ -799,11 +832,11 @@ return (
               <button
                 onClick={handlePrint}
                 className="
-                  flex-1 py-2 
-                  bg-slate-700 hover:bg-slate-800 
-                  text-slate-100 
-                  rounded-lg transition-colors 
-                  flex items-center justify-center gap-2 
+                  flex-1 py-2
+                  bg-slate-700 hover:bg-slate-800
+                  text-slate-100
+                  rounded-lg transition-colors
+                  flex items-center justify-center gap-2
                   group
                 "
                 title="Print order"
@@ -816,8 +849,8 @@ return (
                 onClick={handleAssignDelivery}
                 disabled={order.order_status !== 'handover'}
                 className={`
-                  flex-1 py-2 
-                  rounded-lg transition-colors 
+                  flex-1 py-2
+                  rounded-lg transition-colors
                   flex items-center justify-center gap-2
                   ${order.order_status === 'handover'
                     ? 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer'
@@ -843,11 +876,11 @@ return (
             <button
               onClick={handlePrint}
               className="
-                w-full py-2 
-                bg-slate-700 hover:bg-slate-800 
-                text-slate-100 
-                rounded-lg transition-colors 
-                flex items-center justify-center gap-2 
+                flex-1 py-2
+                bg-slate-700 hover:bg-slate-800
+                text-slate-100
+                rounded-lg transition-colors
+                flex items-center justify-center gap-2
                 group
               "
               title="Print order"
@@ -857,7 +890,31 @@ return (
               <span className="inline @[350px]:hidden">Print</span>
             </button>
           )}
+
+          {/* Ellipsis menu — Bump Order (local hide, no backend change) */}
+          <div className="relative flex-shrink-0" onMouseDown={e => e.stopPropagation()}>
+            <button
+              onClick={() => setMenuOpen(v => !v)}
+              className="h-full px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg flex items-center justify-center transition-colors"
+              title="Order actions"
+            >
+              <RectangleEllipsis className="w-5 h-5" />
+            </button>
+            {menuOpen && (
+              <div className="absolute bottom-full right-0 mb-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 overflow-hidden min-w-[150px]">
+                <button
+                  onClick={handleBumpLocal}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-sm font-semibold text-left bg-slate-800 hover:bg-slate-900 text-white transition-colors"
+                >
+                  <RectangleEllipsis className="w-4 h-4 flex-shrink-0" />
+                  Bump Order
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+        </>
+        )}
       </div>
     </div>
 
