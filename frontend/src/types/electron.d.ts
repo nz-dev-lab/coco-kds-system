@@ -54,6 +54,8 @@ export interface TMBillAPI {
   disconnect: () => Promise<{ success: boolean }>;
   fetchRunningTables: () => Promise<{ success: boolean; count: number; settledCount: number }>;
   updateItemStatus: (kotItemId: number, isReady: boolean) => Promise<{ success: boolean }>;
+  updateKotStatus: (kotId: number, tableId: number, tableName: string, status: number) => Promise<{ success: boolean }>;
+  updateOrderKotStatus: (orderId: string, status: number) => Promise<{ success: boolean }>;
   onServiceFound: (callback: (service: any) => void) => void;
   onServiceLost: (callback: (name: string) => void) => void;
   onOrdersRefreshed: (callback: (data: { running: any[]; settled: any[] }) => void) => () => void;

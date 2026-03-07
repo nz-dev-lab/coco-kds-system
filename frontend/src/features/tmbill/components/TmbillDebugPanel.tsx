@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {TMBillService} from "../../../../electron/plugins/tmbill/types";
-import {CocoKDSOrder, CocoKDSOrderItem} from "../../../../electron/plugins/tmbill/transformer";
+import {CocoKDSOrder} from "../../../../electron/plugins/tmbill/transformer";
 
 interface CapturedData {
   timestamp: string;
@@ -39,6 +39,18 @@ export default function TMBillDebugPanel() {
     }
 
     addLog('🚀 Debug panel loaded');
+    // Pre-fill fields from saved credentials
+    const saved = localStorage.getItem('tmbill_credentials');
+    if (saved) {
+      try {
+        const { service, username: u, password: p } = JSON.parse(saved);
+        setUsername(u || '');
+        setPassword(p || '');
+        if (service?.host) setManualIP(service.host);
+        if (service?.port) setManualPort(String(service.port));
+        addLog(`💾 Saved credentials loaded for ${u}@${service?.host}`);
+      } catch {}
+    }
     loadData();
 
     // Listen for service discovery
@@ -70,47 +82,6 @@ export default function TMBillDebugPanel() {
     if (window.tmbill.onLog) {
       window.tmbill.onLog((data: { message: string; type?: string }) => {
         addLog(data.message);
-      });
-    }
-
-    // Listen for orders
-    if (window.tmbill.onNewOrder) {
-      window.tmbill.onNewOrder((order: CocoKDSOrder) => {
-        addLog(`📦 New order received: ${order.order_number}`);
-        setOrders((prev) => [order, ...prev]);
-        
-        captureData({
-          timestamp: new Date().toISOString(),
-          type: 'event',
-          data: {
-            event: 'new-order',
-            order: order
-          }
-        });
-      });
-    }
-
-    if (window.tmbill.onOrderUpdated) {
-      window.tmbill.onOrderUpdated((order: CocoKDSOrder) => {
-        addLog(`🔄 Order updated: ${order.order_number}`);
-        setOrders((prev) => {
-          const index = prev.findIndex((o) => o.id === order.id);
-          if (index >= 0) {
-            const updated = [...prev];
-            updated[index] = order;
-            return updated;
-          }
-          return prev;
-        });
-        
-        captureData({
-          timestamp: new Date().toISOString(),
-          type: 'event',
-          data: {
-            event: 'order-updated',
-            order: order
-          }
-        });
       });
     }
 
@@ -321,9 +292,16 @@ export default function TMBillDebugPanel() {
         setIsConnected(true);
         addLog('✅ Socket.IO connected successfully!');
         addLog('👂 Now listening for orders...');
+        // Persist credentials so app auto-connects on next launch
+        localStorage.setItem('tmbill_credentials', JSON.stringify({
+          service: services[0],
+          username,
+          password,
+        }));
+        addLog('💾 Credentials saved — will auto-connect on next launch');
         await loadData();
       } else {
-        addLog(`❌ Connection failed: ${result.error}`);
+        addLog(`❌ Connection failed (connected: ${result.connected})`);
       }
     } catch (error: any) {
       addLog(`❌ Connection error: ${error.message}`);

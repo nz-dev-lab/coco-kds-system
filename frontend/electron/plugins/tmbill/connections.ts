@@ -297,6 +297,56 @@ export class TMBillConnection {
     });
   }
 
+  /**
+   * Update a table KOT status (dine-in / takeaway / delivery).
+   * 1. Persists to DB via PATCH /api/kds/kot
+   * 2. After 400ms emits kds-kot-updated (triggers re-fetch on other KDS screens)
+   *    and kds-kot-status-updated (updates status badge instantly on other screens)
+   * Uses KOT_STATES_BYFLAG: 3=Preparing, 4=Ready, 5=Served
+   */
+  async updateTableKotStatus(kotId: number, tableId: number, tableName: string, status: number) {
+    if (!this.socket || !this.baseUrl || !this.token) throw new Error('Not connected');
+    this.log(`📤 Table KOT ${kotId} → status ${status}`, 'info');
+
+    await fetch(`${this.baseUrl}api/kds/kot`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.token}`,
+      },
+      body: JSON.stringify({ kot_id: kotId, status }),
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    this.socket.emit('kds-kot-updated', { table_id: tableId, kot_id: kotId, status, table_name: tableName });
+    this.socket.emit('kds-kot-status-updated', { table_id: tableId, kot_id: kotId, status, table_name: tableName });
+  }
+
+  /**
+   * Update a quick-bill / settled order KOT status.
+   * 1. Persists to DB via PATCH /api/kds/orderkot
+   * 2. Emits kds-kot-status-updated with forOrder: true
+   * Uses BILL_STATES_BYFLAG: 4=Preparing, 5=Ready, 1=Served
+   */
+  async updateOrderKotStatus(orderId: string, status: number) {
+    if (!this.socket || !this.baseUrl || !this.token) throw new Error('Not connected');
+    this.log(`📤 Order KOT ${orderId} → status ${status}`, 'info');
+
+    await fetch(`${this.baseUrl}api/kds/orderkot`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.token}`,
+      },
+      body: JSON.stringify({ order_id: orderId, status }),
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    this.socket.emit('kds-kot-status-updated', { forOrder: true, order_id: orderId, status });
+  }
+
   disconnect() {
     if (this.socket) {
       this.log('🔌 Disconnecting...', 'info');

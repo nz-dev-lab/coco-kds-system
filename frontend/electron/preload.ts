@@ -116,6 +116,12 @@ onOrderSettled: (callback: (data: { tableId: number }) => void) => {
   return () => ipcRenderer.removeListener('tmbill:order-settled', sub);
 },
 
+updateKotStatus: (kotId: number, tableId: number, tableName: string, status: number) =>
+  ipcRenderer.invoke('tmbill:update-kot-status', kotId, tableId, tableName, status),
+
+updateOrderKotStatus: (orderId: string, status: number) =>
+  ipcRenderer.invoke('tmbill:update-order-kot-status', orderId, status),
+
   onLog: (callback: (data: { message: string; type?: string }) => void) => {
     ipcRenderer.on('tmbill:log', (_, data) => callback(data));
   },
@@ -172,6 +178,8 @@ declare global {
       onOrdersRefreshed: (callback: (data: { running: any[]; settled: any[] }) => void) => () => void;
       onOrderRemoved: (callback: (data: { id: string }) => void) => () => void;
       onOrderSettled: (callback: (data: { tableId: number }) => void) => () => void;
+      updateKotStatus: (kotId: number, tableId: number, tableName: string, status: number) => Promise<{ success: boolean }>;
+      updateOrderKotStatus: (orderId: string, status: number) => Promise<{ success: boolean }>;
       onLog: (callback: (data: { message: string; type?: string }) => void) => void;
     };
   }

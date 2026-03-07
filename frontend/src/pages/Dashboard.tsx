@@ -1,8 +1,9 @@
 // src/pages/Dashboard.tsx
 import { useEffect, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchOrders } from '../store/slices/ordersSlice';
+import { fetchOrders, selectAllActiveOrders } from '../store/slices/ordersSlice';
 import OrderCard from '../components/orders/OrderCard';
+import TmbillOrderCard from '../components/orders/TmbillOrderCard';
 import { RefreshCw, Clock } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useLiveClock } from '../hooks/useLiveClock';
@@ -10,7 +11,11 @@ import { clearRecentlyUpdated, releaseFocus } from '@/store/slices/uiSlice';
 
 export default function Dashboard() {
   const dispatch = useAppDispatch();
-  const { orders, loading, error } = useAppSelector((state) => state.orders);
+  // Cast to any[] — Dashboard is not yet shape-aware for TMBILL vs CocoEats orders.
+  // TMBILL orders have `status` not `order_status`; filter/sort fall back to 99 priority which is correct.
+  // OrderCard internals will be updated when the TMBILL card component is built.
+  const orders = useAppSelector(selectAllActiveOrders) as any[];
+  const { loading, error } = useAppSelector((state) => state.orders);
   const sidebarOpen = useAppSelector((state) => state.ui.sidebarOpen);
   const focusedOrderId = useAppSelector((state) => state.ui.focusedOrderId);
   const focusedOrderPosition = useAppSelector((state) => state.ui.focusedOrderPosition);
@@ -41,14 +46,15 @@ export default function Dashboard() {
   };
 }, [dispatch]);
 
-  // Filter out delivered orders
+  // Filter out completed/delivered orders
   const activeOrders = orders.filter((order) => {
-    // Exclude delivered orders
+    // CocoEats: exclude delivered and picked_up
     if (order.order_status === 'delivered') return false;
-    
-    // Exclude picked_up orders (they go to Dispatch page)
     if (order.order_status === 'picked_up') return false;
-    
+
+    // TMBILL: exclude served orders (status 5 = SERVED maps to 'handover')
+    if (order._source === 'tmbill' && order.status === 'handover') return false;
+
     return true;
   });
 
@@ -202,12 +208,10 @@ export default function Dashboard() {
               : 'lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
             }
           `}>
-            {sortedOrders.map((order, index) => (
-  <OrderCard 
-    key={order.id} 
-    order={order} 
-    gridPosition={index}  /* ✨ PASS POSITION */
-  />
+            {sortedOrders.map((order: any, index) => (
+  order._source === 'tmbill'
+    ? <TmbillOrderCard key={order.id} order={order} gridPosition={index} />
+    : <OrderCard key={order.id} order={order} gridPosition={index} /* ✨ PASS POSITION */ />
 ))}
           </div>
         )}

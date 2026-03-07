@@ -2,7 +2,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { Order } from '@/types/order.type';
-import { CocoKDSOrder } from 'electron/plugins/tmbill/transformer';
+import { CocoKDSOrder, transformTMBillSettledOrder } from '../../../electron/plugins/tmbill/transformer';
 import { DisplayOrder } from '@/types/display-order.type';
 
 interface OrdersState {
@@ -13,7 +13,7 @@ interface OrdersState {
   newOrderIds: string[];
    // ── TMBILL ──────────────────────────────
   tmbillRunningOrders: CocoKDSOrder[];   // from tables[] — normal KOTs
-  tmbillSettledOrders: any[];            // from settledOrders[] — quick bills
+  tmbillSettledOrders: CocoKDSOrder[];   // from settledOrders[] — quick bills (pre-transformed)
 }
 
 const initialState: OrdersState = {
@@ -166,7 +166,7 @@ setTmbillOrders: (
   action: PayloadAction<{ running: CocoKDSOrder[]; settled: any[] }>
 ) => {
   state.tmbillRunningOrders = action.payload.running;
-  state.tmbillSettledOrders = action.payload.settled;
+  state.tmbillSettledOrders = action.payload.settled.map(transformTMBillSettledOrder);
 },
 
 // ── TMBILL: Remove running order by id (websocket-kot-cancelled) ─────────────
@@ -183,6 +183,20 @@ removeTmbillOrderByTableId: (state, action: PayloadAction<{ tableId: number }>) 
   state.tmbillRunningOrders = state.tmbillRunningOrders.filter(
     o => o._tmbill_table_id !== action.payload.tableId
   );
+},
+
+// Item ready toggle for TMBILL (local UI only — IPC call handled separately)
+toggleTmbillItemReady(
+  state,
+  action: PayloadAction<{ orderId: string; itemId: string }>
+) {
+  const order =
+    state.tmbillRunningOrders.find((o) => o.id === action.payload.orderId) ??
+    state.tmbillSettledOrders.find((o) => o.id === action.payload.orderId);
+  if (order) {
+    const item = order.items.find((i) => i.id === action.payload.itemId);
+    if (item) item.isReady = !item.isReady;
+  }
 },
   },
   extraReducers: (builder) => {
@@ -335,6 +349,7 @@ export const {
   setTmbillOrders,
   removeTmbillOrder,
   removeTmbillOrderByTableId,
+  toggleTmbillItemReady
 } = ordersSlice.actions;
 // Selectors for TMBILL orders
 export const selectTmbillRunningOrders = (state: { orders: OrdersState }) =>
@@ -351,6 +366,7 @@ export const selectTmbillSettledOrders = (state: { orders: OrdersState }) =>
 export const selectAllActiveOrders = (state: { orders: OrdersState }): DisplayOrder[] => [
   ...state.orders.orders.map(o => ({ ...o, _source: 'cocoeats' as const })),
   ...state.orders.tmbillRunningOrders,
+  ...state.orders.tmbillSettledOrders,
 ];
 
 export default ordersSlice.reducer;

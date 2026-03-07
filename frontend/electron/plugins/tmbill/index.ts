@@ -176,8 +176,14 @@ export class TMBillPlugin {
         });
 
         this.state.connected = true;
-        this.log('✅ All listeners active. Waiting for orders...', 'success');
-        
+        this.log('✅ All listeners active. Fetching initial orders...', 'success');
+
+        // Initial fetch — sends tmbill:orders-refreshed to renderer immediately
+        const { tables, settledOrders } = await this.connection.fetchRunningTables();
+        const transformedOrders = tables.map(t => transformTMBillRunningTable(t));
+        this.sendToRenderer('tmbill:orders-refreshed', { running: transformedOrders, settled: settledOrders });
+        this.log(`📋 Initial fetch: ${transformedOrders.length} running, ${settledOrders.length} settled`, 'success');
+
         return { success: true, connected: this.connection.isConnected() };
       } catch (error: any) {
         this.state.lastError = error.message;
@@ -210,6 +216,32 @@ export class TMBillPlugin {
         return { success: true };
       } catch (error: any) {
         this.log(`❌ Item status update failed: ${error.message}`, 'error');
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('tmbill:update-kot-status', async (_event, kotId: number, tableId: number, tableName: string, status: number) => {
+      try {
+        await this.connection.updateTableKotStatus(kotId, tableId, tableName, status);
+        const { tables, settledOrders } = await this.connection.fetchRunningTables();
+        const transformedOrders = tables.map(t => transformTMBillRunningTable(t));
+        this.sendToRenderer('tmbill:orders-refreshed', { running: transformedOrders, settled: settledOrders });
+        return { success: true };
+      } catch (error: any) {
+        this.log(`❌ KOT status update failed: ${error.message}`, 'error');
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('tmbill:update-order-kot-status', async (_event, orderId: string, status: number) => {
+      try {
+        await this.connection.updateOrderKotStatus(orderId, status);
+        const { tables, settledOrders } = await this.connection.fetchRunningTables();
+        const transformedOrders = tables.map(t => transformTMBillRunningTable(t));
+        this.sendToRenderer('tmbill:orders-refreshed', { running: transformedOrders, settled: settledOrders });
+        return { success: true };
+      } catch (error: any) {
+        this.log(`❌ Order KOT status update failed: ${error.message}`, 'error');
         return { success: false, error: error.message };
       }
     });

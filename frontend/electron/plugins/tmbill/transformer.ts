@@ -65,7 +65,7 @@ export interface TMBillRunningItem {
   item_tax_value: number;
   item_tax_method: number;
   item_is_devidable: number;
-  orderstatus?: number;       // item status — NOT item_status. 0=pending,1=preparing,2=ready
+  orderstatus?: string;       // item status — NOT item_status. "Placed" | "Ready" (string, not number)
   previousstatus?: number;
   comment?: string;           // special instructions / kitchen notes
   kot_id: number;
@@ -147,7 +147,9 @@ export interface CocoKDSOrder {
   // TMBILL-specific fields (won't exist on CocoEats orders)
   _source: 'tmbill';
   _tmbill_kot_id: number;     // raw numeric ID for API callbacks
-  _tmbill_table_id: number;   // needed for kds-kot-updated matching
+  _tmbill_table_id: number;   // needed for kds-kot-updated socket payload
+  _tmbill_table_name: string; // needed for kds-kot-updated socket payload
+  _tmbill_order_id: string;   // order_id for quick-bill KOTs (PATCH /api/kds/orderkot)
   _tmbill_original: TMBillKotSavedPayload | TMBillRunningTable;
 }
 
@@ -158,7 +160,7 @@ export interface CocoKDSOrderItem {
   quantity: number;
   price: string;              // from `item_price`
   notes: string;              // from `comment` + `note` combined
-  isReady: boolean;           // orderstatus >= 2
+  isReady: boolean;           // orderstatus === 'Ready'
   // TMBILL-specific
   _tmbill_item_id: number;    // raw kot_item_id for status update API calls
 }
@@ -189,6 +191,8 @@ export function transformTMBillRunningTable(table: TMBillRunningTable): CocoKDSO
     _source: 'tmbill',
     _tmbill_kot_id: table.kot_id,
     _tmbill_table_id: table.table_id,
+    _tmbill_table_name: table.table_name || '',
+    _tmbill_order_id: '',
     _tmbill_original: table,
   };
 }
@@ -219,19 +223,34 @@ function mapItems(rawItems: TMBillRunningItem[]): CocoKDSOrderItem[] {
     quantity: item.quantity ?? 1,
     price: item.item_price ?? '0',                  // field is `item_price`, not `unit_price`
     notes: [item.comment, item.note].filter(Boolean).join(' | '),
-    isReady: (item.orderstatus ?? 0) >= 2,          // field is `orderstatus`, not `item_status`
+    isReady: item.orderstatus === 'Ready',       // field is `orderstatus`, not `item_status`
     _tmbill_item_id: item.kot_item_id,
   }));
 }
 
 // ─── Status Mappers ───────────────────────────────────────────────────────────
 
+// BILL_STATES_BYFLAG: 1=Served, 2=Placed, 3=Bumped, 4=Preparing, 5=Ready
+// Used for settled/quick-bill orders (order_flag field)
+function mapOrderKotStatus(orderFlag: number): string {
+  switch (orderFlag) {
+    case 1: return 'handover';    // Served
+    case 2: return 'pending';     // Placed
+    case 3: return 'pending';     // Bumped
+    case 4: return 'processing';  // Preparing
+    case 5: return 'ready';       // Ready
+    default: return 'pending';
+  }
+}
+
+// KOT_STATES_BYFLAG: 1=Placed, 2=Bumped, 3=Preparing, 4=Ready, 5=Served
 function mapKotStatus(tmbillStatus: number): string {
   switch (tmbillStatus) {
-    case 0: return 'pending';
-    case 1: return 'processing';
-    case 2: return 'ready';
-    case 3: return 'handover';    // "served" maps to CocoKDS handover
+    case 1: return 'pending';     // Placed
+    case 2: return 'pending';     // Bumped — treat as pending in CocoKDS
+    case 3: return 'processing';  // Preparing
+    case 4: return 'ready';       // Ready
+    case 5: return 'handover';    // Served
     default: return 'pending';
   }
 }
@@ -251,6 +270,64 @@ function mapOrderTypeFlag(flag: number): string {
 // ─── Item Status (KDS → POS) ─────────────────────────────────────────────────
 // Used when sending item-status-changed back to TMBILL POS
 
-export function transformItemStatusToTmbill(isReady: boolean): number {
-  return isReady ? 2 : 0;   // 0=pending, 1=preparing, 2=ready (skip 1 for simplicity)
+export function transformItemStatusToTmbill(isReady: boolean): string {
+  return isReady ? 'Ready' : 'Placed';
+}
+
+// ─── Settled Order Transformer: Quick Bill → CocoKDS ─────────────────────────
+// settledOrders from /kds/runningtables have a completely different shape:
+// items are in tmpos_order_child[] not items[], identifier is order_id not kot_id, no kot_number
+
+export interface TMBillSettledOrder {
+  order_id: string;
+  bill_number: number;
+  created_time: number;        // Unix ms timestamp
+  billing_type: number;        // 0 = quick bill
+  order_flag: number;          // 2=placed, 4=preparing, 5=ready, 1=served
+  user_id: string;
+  instructions?: string;
+  tmpos_order_child: {
+    id: number;
+    title: string;
+    quantity: number;
+    note?: string;
+  }[];
+}
+
+export function transformTMBillSettledOrder(order: TMBillSettledOrder): CocoKDSOrder {
+  const items: CocoKDSOrderItem[] = (order.tmpos_order_child ?? []).map((item) => ({
+    id: `ITEM-${item.id}`,
+    food_id: item.id.toString(),
+    name: item.title ?? 'Unknown Item',
+    quantity: item.quantity ?? 1,
+    price: '0',                          // price not available in settled order shape
+    notes: item.note || '',
+    isReady: false,                      // kitchen marks manually
+    _tmbill_item_id: item.id,
+  }));
+
+  return {
+    id: `QB-${order.order_id}`,
+    order_number: `QB-${order.bill_number}`,
+    status: mapOrderKotStatus(order.order_flag),
+    order_type: 'quick_bill',
+    customer_name: 'Quick Bill',
+    customer_phone: '',
+    table_number: '',
+    ordered_by: order.user_id,
+    items,
+    item_count: items.length,
+    total_amount: '0',                   // not available in settled order shape
+    order_age_minutes: order.created_time
+      ? Math.floor((Date.now() - order.created_time) / 60000)
+      : 0,
+    created_at: order.created_time ? order.created_time.toString() : new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    _source: 'tmbill',
+    _tmbill_kot_id: 0,                   // no kot_id for quick bills
+    _tmbill_table_id: 0,                 // no table_id for quick bills
+    _tmbill_table_name: '',
+    _tmbill_order_id: order.order_id,    // used for PATCH /api/kds/orderkot
+    _tmbill_original: order as any,
+  };
 }
