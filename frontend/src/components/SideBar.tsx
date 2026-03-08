@@ -1,7 +1,7 @@
 // components/Sidebar.tsx
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, ClipboardList, Settings, ChevronLeft, ChevronRight, History, Truck, Utensils, BellRing, HelpCircle } from 'lucide-react';
+import { Home, ClipboardList, Settings, ChevronLeft, ChevronRight, History, Truck, Utensils, BellRing, HelpCircle, Wrench } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { toggleSidebar } from '../store/slices/uiSlice';
 
@@ -54,6 +54,12 @@ const navigationItems: NavItem[] = [
     label: 'TMBill Debug',
     icon: History,
     path: '/tmbill-debug',
+  },
+  {
+    id: 'utilities',
+    label: 'Utilities',
+    icon: Wrench,
+    path: '/utilities',
   },
   {
     id: 'help',
@@ -112,7 +118,9 @@ useEffect(() => {
           </div>
 
           <nav className="flex-1 space-y-2">
-            {navigationItems.map((item) => {
+            {navigationItems.filter(item =>
+              item.id !== 'tmbill-debug' || !!window.tmbill
+            ).map((item) => {
               const Icon = item.icon;
               return (
                 <NavLink

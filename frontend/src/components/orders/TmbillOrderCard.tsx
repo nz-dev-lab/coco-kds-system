@@ -5,7 +5,8 @@
 
 import { Bike, Check, CookingPot, RectangleEllipsis, ShoppingBag, Store, User, Zap } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { toggleTmbillItemReady, bumpTmbillOrder, recallTmbillOrder, markOrderAsViewed } from '../../store/slices/ordersSlice';
+import { toggleTmbillItemReady, bumpTmbillOrder, recallTmbillOrder } from '../../store/slices/tmbillOrdersSlice';
+import { markOrderAsViewed } from '../../store/slices/ordersSlice';
 import { useCallback, useEffect, useState } from 'react';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { CocoKDSOrder } from '../../../electron/plugins/tmbill/transformer';

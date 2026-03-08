@@ -1,7 +1,9 @@
 // src/pages/Dashboard.tsx
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchOrders, selectAllActiveOrders, selectTmbillConnected, selectTmbillBumpedOrders, selectCocoeatsBumpedOrders } from '../store/slices/ordersSlice';
+import { fetchOrders, selectCocoeatsBumpedOrders } from '../store/slices/ordersSlice';
+import { selectTmbillConnected, selectTmbillBumpedOrders } from '../store/slices/tmbillOrdersSlice';
+import { selectAllActiveOrders } from '../store/selectors';
 import OrderCard from '../components/orders/OrderCard';
 import TmbillOrderCard from '../components/orders/TmbillOrderCard';
 import { runTmbillAutoConnect } from '@/hooks/useTmbillOrders';

@@ -1,16 +1,25 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
-import { 
-  addCompletedOrder, 
-  getDailyStats, 
-  getOrdersByDate, 
+import {
+  addCompletedOrder,
+  getDailyStats,
+  getOrdersByDate,
   getRevenueTrend,
   cleanupOldOrders,
   closeDatabase,
-  statements 
+  statements,
+  getAllCanonicalItems,
+  addCanonicalItem,
+  updateCanonicalItem,
+  deleteCanonicalItem,
+  addCocoeatsMap,
+  removeCocoeatsMap,
+  addTmbillMap,
+  removeTmbillMap,
 } from './database';
 import { TMBillPlugin } from './plugins/tmbill';
+import { readAppConfig, writeAppConfig } from './appConfig';
 
 
 let mainWindow: BrowserWindow | null = null;
@@ -40,6 +49,11 @@ if (!isDev) {
 }
 
 function createWindow() {
+  // Read config BEFORE creating the window so the preload inherits the env var
+  const appConfig = readAppConfig();
+  process.env.TMBILL_ENABLED = appConfig.tmbill_enabled ? 'true' : 'false';
+  console.log('🔧 App config loaded — TMBILL:', appConfig.tmbill_enabled ? 'ENABLED' : 'DISABLED');
+
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
@@ -130,29 +144,15 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
-// 🆕 Initialize TMBILL plugin (MOVED HERE - works in both dev and production)
   mainWindow.webContents.on('did-finish-load', () => {
-    console.log('\n' + '='.repeat(70));
-    console.log('🔍 TMBILL Plugin Configuration Check');
-    console.log('='.repeat(70));
-    console.log('Environment:', isDev ? 'DEVELOPMENT' : 'PRODUCTION');
-    console.log('Node ENV:', process.env.NODE_ENV);
-    
-    // For development: always enable
-    // For production: check environment variable
-    const tmbillEnabled = true; // isDev || process.env.ENABLE_TMBILL_PLUGIN === 'true';
-    
-    console.log('Plugin Status:', tmbillEnabled ? '✅ ENABLED' : '❌ DISABLED');
-    console.log('='.repeat(70) + '\n');
-    
-    if (tmbillEnabled) {
+    if (appConfig.tmbill_enabled) {
       tmbillPlugin = new TMBillPlugin({
         enabled: true,
         serviceType: '_http._tcp',
         autoConnect: false,
       });
-      
       tmbillPlugin.initialize(mainWindow!);
+      console.log('✅ TMBILL plugin initialized');
     }
   });
 
@@ -340,6 +340,46 @@ ipcMain.handle('db:get-total-count', async (event, restaurantId: string) => {
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
+
+// CONFIG IPC HANDLERS
+ipcMain.handle('config:get', () => {
+  return readAppConfig();
+});
+
+ipcMain.handle('config:set', (_event, patch: { tmbill_enabled?: boolean }) => {
+  return writeAppConfig(patch);
+});
+
+// ITEM MAPPING IPC HANDLERS
+ipcMain.handle('mapping:get-all', () => getAllCanonicalItems());
+
+ipcMain.handle('mapping:add-canonical', (_e, name: string, category: string | null) =>
+  addCanonicalItem(name, category)
+);
+
+ipcMain.handle('mapping:update-canonical', (_e, id: number, name: string, category: string | null) =>
+  updateCanonicalItem(id, name, category)
+);
+
+ipcMain.handle('mapping:delete-canonical', (_e, id: number) =>
+  deleteCanonicalItem(id)
+);
+
+ipcMain.handle('mapping:add-cocoeats-map', (_e, foodId: string, foodName: string, canonicalItemId: number) =>
+  addCocoeatsMap(foodId, foodName, canonicalItemId)
+);
+
+ipcMain.handle('mapping:remove-cocoeats-map', (_e, foodId: string) =>
+  removeCocoeatsMap(foodId)
+);
+
+ipcMain.handle('mapping:add-tmbill-map', (_e, itemName: string, canonicalItemId: number) =>
+  addTmbillMap(itemName, canonicalItemId)
+);
+
+ipcMain.handle('mapping:remove-tmbill-map', (_e, itemName: string) =>
+  removeTmbillMap(itemName)
+);
 
 // ⭐ AUTO-UPDATE USER ACTIONS
 ipcMain.on('download-update', () => {

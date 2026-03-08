@@ -7,7 +7,7 @@ import {
   removeTmbillOrder,
   removeTmbillOrderByTableId,
   setTmbillConnected,
-} from '@/store/slices/ordersSlice';
+} from '@/store/slices/tmbillOrdersSlice';
 
 const TMBILL_PORT    = 3000;
 const RETRY_INTERVAL = 30_000; // retry every 30s when POS not found

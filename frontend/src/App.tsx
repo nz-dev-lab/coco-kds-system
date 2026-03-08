@@ -17,6 +17,7 @@ import { useTmbillOrders } from './hooks/useTmbillOrders';
 
 import History from './pages/History';
 import Orders from './pages/Orders';
+import Utilities from './pages/Utilities';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -61,6 +62,7 @@ function App() {
                     <Route path="/notifications" element={<Notifications />} />
                     <Route path="/history" element={<History />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/utilities" element={<Utilities />} />
                     <Route path="/help" element={<Help />} />
                     <Route path="/tmbill-debug" element={<TMBillDebugPanel />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

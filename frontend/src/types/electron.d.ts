@@ -14,6 +14,20 @@ export interface PrintResult {
   error?: string;
 }
 
+export interface AppConfig {
+  tmbill_enabled: boolean;
+}
+
+export interface CanonicalItem {
+  id: number;
+  name: string;
+  category: string | null;
+  station_id: number | null;
+  created_at: string;
+  cocoeats_maps: { id: number; food_id: string; food_name: string }[];
+  tmbill_maps:   { id: number; item_name: string }[];
+}
+
 export interface ElectronAPI {
   minimizeWindow: () => void;
   maximizeWindow: () => void;
@@ -22,6 +36,10 @@ export interface ElectronAPI {
   isMaximized: () => Promise<boolean>;
   getAppVersion: () => Promise<string>;
   platform: string;
+  config: {
+    get: () => Promise<AppConfig>;
+    set: (patch: Partial<AppConfig>) => Promise<AppConfig>;
+  };
   autoUpdater: {
     onUpdateAvailable: (callback: (info: any) => void) => void;
     onUpdateProgress: (callback: (progress: any) => void) => void;
@@ -36,6 +54,16 @@ export interface ElectronAPI {
     getRevenueTrend: (days: number, restaurantId: string) => Promise<{ success: boolean; data?: any[]; error?: string }>;
     cleanupOldOrders: (days: number, restaurantId: string) => Promise<{ success: boolean; deleted?: number; error?: string }>;
     getTotalCount: (restaurantId: string) => Promise<{ success: boolean; data?: { count: number }; error?: string }>;
+  };
+  mapping: {
+    getAll: () => Promise<{ success: boolean; data?: CanonicalItem[]; error?: string }>;
+    addCanonical: (name: string, category: string | null) => Promise<{ success: boolean; id?: number; error?: string }>;
+    updateCanonical: (id: number, name: string, category: string | null) => Promise<{ success: boolean; error?: string }>;
+    deleteCanonical: (id: number) => Promise<{ success: boolean; error?: string }>;
+    addCocoeatsMap: (foodId: string, foodName: string, canonicalItemId: number) => Promise<{ success: boolean; error?: string }>;
+    removeCocoeatsMap: (foodId: string) => Promise<{ success: boolean; error?: string }>;
+    addTmbillMap: (itemName: string, canonicalItemId: number) => Promise<{ success: boolean; error?: string }>;
+    removeTmbillMap: (itemName: string) => Promise<{ success: boolean; error?: string }>;
   };
   printer: {
     getPrinters: () => Promise<PrinterInfo[]>;

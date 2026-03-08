@@ -257,6 +257,185 @@ export function cleanupOldOrders(days: number = 90, restaurantId: string) {
   }
 }
 
+// ── ITEM MAPPING & STATION ROUTING SCHEMA ────────────────────────────────────
+db.exec(`
+  -- Source-agnostic canonical item registry
+  CREATE TABLE IF NOT EXISTS canonical_items (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    name     TEXT NOT NULL UNIQUE,
+    category TEXT,
+    station_id INTEGER,           -- FK to stations (null until routed)
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- CocoEats food_id → canonical item (one-to-one per food_id)
+  CREATE TABLE IF NOT EXISTS cocoeats_item_map (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    food_id           TEXT NOT NULL UNIQUE,
+    food_name         TEXT NOT NULL,   -- denormalised for display
+    canonical_item_id INTEGER NOT NULL REFERENCES canonical_items(id) ON DELETE CASCADE
+  );
+
+  -- TMBILL item name → canonical item (name-based, no stable ID in TMBILL)
+  CREATE TABLE IF NOT EXISTS tmbill_item_map (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_name         TEXT NOT NULL UNIQUE,
+    canonical_item_id INTEGER NOT NULL REFERENCES canonical_items(id) ON DELETE CASCADE
+  );
+
+  -- Kitchen stations (station routing — tables ready, UI comes later)
+  CREATE TABLE IF NOT EXISTS stations (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE,
+    color       TEXT NOT NULL DEFAULT '#6b7280',
+    description TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_ce_map_canonical ON cocoeats_item_map(canonical_item_id);
+  CREATE INDEX IF NOT EXISTS idx_tb_map_canonical ON tmbill_item_map(canonical_item_id);
+`);
+
+console.log('✅ Item mapping schema ready');
+
+// ── Mapping prepared statements ───────────────────────────────────────────────
+const mappingStatements = {
+  // Fetch all canonical items with their CocoEats + TMBILL mappings
+  getAllCanonical: db.prepare(`
+    SELECT
+      c.id, c.name, c.category, c.station_id, c.created_at,
+      (SELECT json_group_array(json_object('id', m.id, 'food_id', m.food_id, 'food_name', m.food_name))
+       FROM cocoeats_item_map m WHERE m.canonical_item_id = c.id) AS cocoeats_maps,
+      (SELECT json_group_array(json_object('id', t.id, 'item_name', t.item_name))
+       FROM tmbill_item_map t WHERE t.canonical_item_id = c.id) AS tmbill_maps
+    FROM canonical_items c
+    ORDER BY c.name ASC
+  `),
+
+  addCanonical: db.prepare(`
+    INSERT INTO canonical_items (name, category) VALUES (?, ?)
+  `),
+
+  updateCanonical: db.prepare(`
+    UPDATE canonical_items SET name = ?, category = ? WHERE id = ?
+  `),
+
+  deleteCanonical: db.prepare(`
+    DELETE FROM canonical_items WHERE id = ?
+  `),
+
+  addCocoeatsMap: db.prepare(`
+    INSERT OR REPLACE INTO cocoeats_item_map (food_id, food_name, canonical_item_id)
+    VALUES (?, ?, ?)
+  `),
+
+  removeCocoeatsMap: db.prepare(`
+    DELETE FROM cocoeats_item_map WHERE food_id = ?
+  `),
+
+  addTmbillMap: db.prepare(`
+    INSERT OR REPLACE INTO tmbill_item_map (item_name, canonical_item_id)
+    VALUES (?, ?)
+  `),
+
+  removeTmbillMap: db.prepare(`
+    DELETE FROM tmbill_item_map WHERE item_name = ?
+  `),
+
+  lookupByFoodId: db.prepare(`
+    SELECT c.* FROM canonical_items c
+    JOIN cocoeats_item_map m ON m.canonical_item_id = c.id
+    WHERE m.food_id = ?
+  `),
+
+  lookupByTmbillName: db.prepare(`
+    SELECT c.* FROM canonical_items c
+    JOIN tmbill_item_map t ON t.canonical_item_id = c.id
+    WHERE t.item_name = ?
+  `),
+};
+
+// ── Mapping helper functions ──────────────────────────────────────────────────
+
+export function getAllCanonicalItems() {
+  try {
+    const rows = mappingStatements.getAllCanonical.all() as any[];
+    return {
+      success: true,
+      data: rows.map(r => ({
+        ...r,
+        cocoeats_maps: r.cocoeats_maps ? JSON.parse(r.cocoeats_maps) : [],
+        tmbill_maps:   r.tmbill_maps   ? JSON.parse(r.tmbill_maps)   : [],
+      })),
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function addCanonicalItem(name: string, category: string | null) {
+  try {
+    const result = mappingStatements.addCanonical.run(name, category ?? null);
+    return { success: true, id: result.lastInsertRowid };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function updateCanonicalItem(id: number, name: string, category: string | null) {
+  try {
+    mappingStatements.updateCanonical.run(name, category ?? null, id);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function deleteCanonicalItem(id: number) {
+  try {
+    mappingStatements.deleteCanonical.run(id);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function addCocoeatsMap(foodId: string, foodName: string, canonicalItemId: number) {
+  try {
+    mappingStatements.addCocoeatsMap.run(foodId, foodName, canonicalItemId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function removeCocoeatsMap(foodId: string) {
+  try {
+    mappingStatements.removeCocoeatsMap.run(foodId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function addTmbillMap(itemName: string, canonicalItemId: number) {
+  try {
+    mappingStatements.addTmbillMap.run(itemName, canonicalItemId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function removeTmbillMap(itemName: string) {
+  try {
+    mappingStatements.removeTmbillMap.run(itemName);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 // Graceful shutdown
 export function closeDatabase() {
   try {

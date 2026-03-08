@@ -57,6 +57,31 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('db:get-total-count', restaurantId),
   },
 
+  // App config
+  config: {
+    get: () => ipcRenderer.invoke('config:get'),
+    set: (patch: { tmbill_enabled?: boolean }) => ipcRenderer.invoke('config:set', patch),
+  },
+
+  // Item mapping API
+  mapping: {
+    getAll: () => ipcRenderer.invoke('mapping:get-all'),
+    addCanonical: (name: string, category: string | null) =>
+      ipcRenderer.invoke('mapping:add-canonical', name, category),
+    updateCanonical: (id: number, name: string, category: string | null) =>
+      ipcRenderer.invoke('mapping:update-canonical', id, name, category),
+    deleteCanonical: (id: number) =>
+      ipcRenderer.invoke('mapping:delete-canonical', id),
+    addCocoeatsMap: (foodId: string, foodName: string, canonicalItemId: number) =>
+      ipcRenderer.invoke('mapping:add-cocoeats-map', foodId, foodName, canonicalItemId),
+    removeCocoeatsMap: (foodId: string) =>
+      ipcRenderer.invoke('mapping:remove-cocoeats-map', foodId),
+    addTmbillMap: (itemName: string, canonicalItemId: number) =>
+      ipcRenderer.invoke('mapping:add-tmbill-map', itemName, canonicalItemId),
+    removeTmbillMap: (itemName: string) =>
+      ipcRenderer.invoke('mapping:remove-tmbill-map', itemName),
+  },
+
   // Printer APIs
   printer: {
     getPrinters: () => ipcRenderer.invoke('get-printers'),
@@ -67,6 +92,9 @@ contextBridge.exposeInMainWorld('electron', {
 });
 
 // ── TMBILL Plugin API ─────────────────────────────────────────────────────────
+// Only exposed when tmbill_enabled: true in config.json.
+// All UI components gate on !!window.tmbill — if not exposed, TMBILL UI is hidden.
+if (process.env.TMBILL_ENABLED === 'true') {
 contextBridge.exposeInMainWorld('tmbill', {
   // Discovery
   getServices: () => ipcRenderer.invoke('tmbill:get-services'),
@@ -131,5 +159,6 @@ updateOrderKotStatus: (orderId: string, status: number) =>
     ipcRenderer.on('tmbill:log', (_, data) => callback(data));
   },
 });
+} // end if (TMBILL_ENABLED)
 
 // ── Type declarations live in src/types/electron.d.ts (included in frontend tsconfig) ──

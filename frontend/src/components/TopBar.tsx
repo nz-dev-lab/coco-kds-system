@@ -59,7 +59,7 @@ export default function TopBar() {
             >
               <option value="all">All Orders</option>
               <option value="cocoeats">CocoEats</option>
-              <option value="tmbill">TMBILL POS</option>
+              {!!window.tmbill && <option value="tmbill">TMBILL POS</option>}
             </select>
           </div>
 

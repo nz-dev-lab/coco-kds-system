@@ -53,7 +53,7 @@ export default function ScheduledOrderDebug() {
           quantity: 1,
           price: '15.99',
           variant: null,
-          variation: [],  // ← Was "variations" (wrong!)
+          variations: [],
           add_ons: [],    // ← Correct
         }
       ],
