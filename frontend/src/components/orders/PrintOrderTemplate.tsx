@@ -4,13 +4,14 @@ import { Order } from '@/types/order.type';
 interface PrintOrderTemplateProps {
   order: Order;
   restaurantName?: string;
+  paperWidth?: 58 | 80;
 }
 
 /**
  * Print template optimized for 80mm thermal printers
  * Matches Laravel receipt calculation exactly
  */
-export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order, restaurantName }) => {
+export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order, restaurantName, paperWidth = 80 }) => {
   const formatDateTime = (date: string) => {
     return new Date(date).toLocaleString('en-GB', {
       day: '2-digit',
@@ -63,7 +64,7 @@ export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order, r
   return (
     <div
       style={{
-        width: '80mm',
+        width: `${paperWidth}mm`,
         fontFamily: 'monospace',
         fontSize: '12px',
         padding: '5mm',

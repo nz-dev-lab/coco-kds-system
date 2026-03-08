@@ -111,7 +111,7 @@ export const usePrintOrder = () => {
               `}</style>
             </head>
             <body>
-              <PrintOrderTemplate order={order} restaurantName={restaurantName ?? undefined} />
+              <PrintOrderTemplate order={order} restaurantName={restaurantName ?? undefined} paperWidth={paperWidth as 58 | 80} />
             </body>
           </html>
         );
