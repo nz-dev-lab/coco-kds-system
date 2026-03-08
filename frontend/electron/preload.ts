@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  platform: process.platform,
 
   // Auto-updater
   autoUpdater: {
@@ -60,8 +61,8 @@ contextBridge.exposeInMainWorld('electron', {
   printer: {
     getPrinters: () => ipcRenderer.invoke('get-printers'),
     getDefaultPrinter: () => ipcRenderer.invoke('get-default-printer'),
-    printOrder: (orderHtml: string, printerName?: string) =>
-      ipcRenderer.invoke('print-order', orderHtml, printerName),
+    printOrder: (orderHtml: string, printerName?: string, paperWidth?: 58 | 80) =>
+      ipcRenderer.invoke('print-order', orderHtml, printerName, paperWidth),
   },
 });
 
@@ -131,60 +132,4 @@ updateOrderKotStatus: (orderId: string, status: number) =>
   },
 });
 
-// ── Type declarations ─────────────────────────────────────────────────────────
-declare global {
-  interface Window {
-    electron: {
-      minimizeWindow: () => void;
-      maximizeWindow: () => void;
-      closeWindow: () => void;
-      toggleFullscreen: () => void;
-      isMaximized: () => Promise<boolean>;
-      send: (channel: string, data: any) => void;
-      on: (channel: string, func: (...args: any[]) => void) => () => void;
-      invoke: (channel: string, ...args: any[]) => Promise<any>;
-      getAppVersion: () => Promise<string>;
-      autoUpdater: {
-        onUpdateAvailable: (callback: (info: any) => void) => void;
-        onUpdateProgress: (callback: (progress: any) => void) => void;
-        onUpdateDownloaded: (callback: (info: any) => void) => void;
-        downloadUpdate: () => void;
-        installUpdate: () => void;
-      };
-      database: {
-        addCompletedOrder: (order: any) => Promise<any>;
-        getDailyStats: (date: string, restaurantId: string) => Promise<any>;
-        getOrdersByDate: (date: string, restaurantId: string) => Promise<any>;
-        getRevenueTrend: (days: number, restaurantId: string) => Promise<any>;
-        cleanupOldOrders: (days: number, restaurantId: string) => Promise<any>;
-        getTotalCount: (restaurantId: string) => Promise<any>;
-      };
-      printer: {
-        getPrinters: () => Promise<any[]>;
-        getDefaultPrinter: () => Promise<any>;
-        printOrder: (orderHtml: string, printerName?: string) => Promise<any>;
-      };
-    };
-
-    tmbill: {
-      getServices: () => Promise<any[]>;
-      startDiscovery: () => Promise<{ success: boolean }>;
-      stopDiscovery: () => Promise<{ success: boolean }>;
-      getState: () => Promise<any>;
-      getConfig: () => Promise<any>;
-      authenticate: (service: any, username: string, password: string) => Promise<any>;
-      connectSocket: () => Promise<{ success: boolean; connected: boolean }>;
-      disconnect: () => Promise<{ success: boolean }>;
-      fetchRunningTables: () => Promise<{ success: boolean; count: number; settledCount: number }>;
-      updateItemStatus: (kotItemId: number, isReady: boolean) => Promise<{ success: boolean }>;
-      onServiceFound: (callback: (service: any) => void) => void;
-      onServiceLost: (callback: (name: string) => void) => void;
-      onOrdersRefreshed: (callback: (data: { running: any[]; settled: any[] }) => void) => () => void;
-      onOrderRemoved: (callback: (data: { id: string }) => void) => () => void;
-      onOrderSettled: (callback: (data: { tableId: number }) => void) => () => void;
-      updateKotStatus: (kotId: number, tableId: number, tableName: string, status: number) => Promise<{ success: boolean }>;
-      updateOrderKotStatus: (orderId: string, status: number) => Promise<{ success: boolean }>;
-      onLog: (callback: (data: { message: string; type?: string }) => void) => void;
-    };
-  }
-}
+// ── Type declarations live in src/types/electron.d.ts (included in frontend tsconfig) ──

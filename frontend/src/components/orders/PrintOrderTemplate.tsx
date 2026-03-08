@@ -3,13 +3,14 @@ import { Order } from '@/types/order.type';
 
 interface PrintOrderTemplateProps {
   order: Order;
+  restaurantName?: string;
 }
 
 /**
  * Print template optimized for 80mm thermal printers
  * Matches Laravel receipt calculation exactly
  */
-export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order }) => {
+export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order, restaurantName }) => {
   const formatDateTime = (date: string) => {
     return new Date(date).toLocaleString('en-GB', {
       day: '2-digit',
@@ -33,34 +34,31 @@ export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order })
     }
   };
 
-  // ✅ CORRECT CALCULATION: Reverse calculate items subtotal
-  const calculateItemsSubtotal = () => {
-    const orderAmount = parseFloat(order.order_amount || '0');
-    const deliveryCharge = parseFloat(order.delivery_charge || '0');
-    const dmTips = parseFloat(order.dm_tips || '0');
-    const additionalCharge = parseFloat(order.additional_charge || '0');
-    const extraPackaging = parseFloat(order.extra_packaging_amount || '0');
-    const couponDiscount = parseFloat(order.coupon_discount_amount || '0');
-    const restaurantDiscount = parseFloat(order.restaurant_discount_amount || '0');
+  // Parse all financial values up front
+  const orderAmount        = parseFloat(order.order_amount || '0');
+  const deliveryCharge     = parseFloat(order.delivery_charge || '0');
+  const dmTips             = parseFloat(order.dm_tips || '0');
+  const additionalCharge   = parseFloat(order.additional_charge || '0');
+  const extraPackaging     = parseFloat(order.extra_packaging_amount || '0');
+  const couponDiscount     = parseFloat(order.coupon_discount_amount || '0');
+  const restaurantDiscount = parseFloat(order.restaurant_discount_amount || '0');
+  const refBonus           = parseFloat(order.ref_bonus_amount || '0');
+  const totalTax           = parseFloat(order.total_tax_amount || '0');
+  const taxExcluded        = order.tax_status === 'excluded';
+  const partiallyPaid      = parseFloat(order.partially_paid_amount || '0');
 
-    // Formula: items = order_amount - delivery - tips - extras + discounts
-    const itemsTotal = 
-      orderAmount 
-      - deliveryCharge 
-      - dmTips 
-      - additionalCharge 
-      - extraPackaging 
-      + couponDiscount 
-      + restaurantDiscount;
-
-    return itemsTotal;
-  };
-
-  const itemsSubtotal = calculateItemsSubtotal();
-  const totalTax = parseFloat(order.total_tax_amount || '0');
-  const totalDiscount = 
-    parseFloat(order.coupon_discount_amount || '0') + 
-    parseFloat(order.restaurant_discount_amount || '0');
+  // Reverse-calculate items subtotal
+  // If tax is excluded it was added ON TOP of order_amount so we subtract it back out
+  const itemsSubtotal =
+    orderAmount
+    - deliveryCharge
+    - dmTips
+    - additionalCharge
+    - extraPackaging
+    - (taxExcluded ? totalTax : 0)
+    + couponDiscount
+    + restaurantDiscount
+    + refBonus;
 
   return (
     <div
@@ -75,8 +73,11 @@ export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order })
     >
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: '10px', borderBottom: '2px dashed #000', paddingBottom: '10px' }}>
-        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>KITCHEN ORDER</div>
-        <div style={{ fontSize: '20px', marginTop: '5px' }}>#{order.id}</div>
+        <div style={{ fontSize: '22px', fontWeight: 'bold' }}>CocoEats UK</div>
+        {restaurantName && (
+          <div style={{ fontSize: '11px', marginTop: '3px', color: '#444' }}>{restaurantName}</div>
+        )}
+        <div style={{ fontSize: '20px', marginTop: '6px' }}>#{order.id}</div>
       </div>
 
       {/* Order Info */}
@@ -141,13 +142,11 @@ export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order })
               </div>
             </div>
 
-            {/* Variations */}
-            {item.variation && item.variation.length > 0 && (
+            {/* Variations — price already included in item.price, show as info only */}
+            {item.variations && item.variations.length > 0 && (
               <div style={{ fontSize: '11px', marginLeft: '10px', color: '#333' }}>
-                {item.variation.map((v, vIdx) => (
-                  <div key={vIdx}>
-                    • {v.type}: {v.name} (+£{parseFloat(v.price).toFixed(2)})
-                  </div>
+                {item.variations.map((v, vIdx) => (
+                  <div key={vIdx}>• {v.type}: {v.name}</div>
                 ))}
               </div>
             )}
@@ -185,21 +184,20 @@ export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order })
             <strong>Items Total:</strong>
             <span style={{ fontWeight: 'bold' }}>£{itemsSubtotal.toFixed(2)}</span>
           </div>
-          {/* Tax info (informational only - NOT added to total) */}
-          {totalTax > 0 && (
+          {totalTax > 0 && !taxExcluded && (
             <div style={{ fontSize: '10px', color: '#666', marginLeft: '10px' }}>
               (Tax £{totalTax.toFixed(2)} included)
             </div>
           )}
         </div>
 
-        {/* Add-ons Total (if any) */}
+        {/* Add-ons Total */}
         {order.items?.some(item => item.add_ons && item.add_ons.length > 0) && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '11px' }}>
             <span>Addon Cost:</span>
             <span>
               £{order.items.reduce((total, item) => {
-                const addonsTotal = item.add_ons?.reduce((sum, addon) => 
+                const addonsTotal = item.add_ons?.reduce((sum, addon) =>
                   sum + (parseFloat(addon.price) * addon.quantity), 0) || 0;
                 return total + addonsTotal;
               }, 0).toFixed(2)}
@@ -208,71 +206,103 @@ export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order })
         )}
 
         {/* Discounts */}
-        {parseFloat(order.restaurant_discount_amount || '0') > 0 && (
+        {restaurantDiscount > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', color: '#d9534f' }}>
             <strong>Restaurant Discount:</strong>
-            <span style={{ fontWeight: 'bold' }}>-£{parseFloat(order.restaurant_discount_amount || '0').toFixed(2)}</span>
+            <span style={{ fontWeight: 'bold' }}>-£{restaurantDiscount.toFixed(2)}</span>
+          </div>
+        )}
+        {couponDiscount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', color: '#d9534f' }}>
+            <strong>Coupon Discount:</strong>
+            <span style={{ fontWeight: 'bold' }}>-£{couponDiscount.toFixed(2)}</span>
+          </div>
+        )}
+        {refBonus > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', color: '#d9534f' }}>
+            <strong>Referral Discount:</strong>
+            <span style={{ fontWeight: 'bold' }}>-£{refBonus.toFixed(2)}</span>
           </div>
         )}
 
-        {parseFloat(order.coupon_discount_amount || '0') > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', color: '#d9534f' }}>
-            <strong>Coupon Discount:</strong>
-            <span style={{ fontWeight: 'bold' }}>-£{parseFloat(order.coupon_discount_amount || '0').toFixed(2)}</span>
+        {/* Subtotal — only shown when at least one discount applies */}
+        {(restaurantDiscount > 0 || couponDiscount > 0 || refBonus > 0) && (() => {
+          const subtotal = itemsSubtotal - restaurantDiscount - couponDiscount - refBonus;
+          return (
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              borderTop: '1px dashed #000', paddingTop: '5px', marginTop: '5px', marginBottom: '5px',
+            }}>
+              <strong>Subtotal:</strong>
+              <span style={{ fontWeight: 'bold' }}>£{subtotal.toFixed(2)}</span>
+            </div>
+          );
+        })()}
+
+        {/* Tax (excluded mode — added on top) */}
+        {taxExcluded && totalTax > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+            <strong>VAT/Tax:</strong>
+            <span>£{totalTax.toFixed(2)}</span>
           </div>
         )}
 
         {/* Delivery Charge */}
-        {parseFloat(order.delivery_charge || '0') > 0 && (
+        {deliveryCharge > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
             <strong>Delivery Charge:</strong>
-            <span>£{parseFloat(order.delivery_charge).toFixed(2)}</span>
+            <span>£{deliveryCharge.toFixed(2)}</span>
           </div>
         )}
 
         {/* DM Tips */}
-        {parseFloat(order.dm_tips || '0') > 0 && (
+        {dmTips > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
             <strong>Delivery Tips:</strong>
-            <span>£{parseFloat(order.dm_tips || '0').toFixed(2)}</span>
+            <span>£{dmTips.toFixed(2)}</span>
           </div>
         )}
 
-        {/* Additional Charge */}
-        {parseFloat(order.additional_charge || '0') > 0 && (
+        {/* Service Charge */}
+        {additionalCharge > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
             <strong>Service Charge:</strong>
-            <span>£{parseFloat(order.additional_charge || '0').toFixed(2)}</span>
+            <span>£{additionalCharge.toFixed(2)}</span>
           </div>
         )}
 
         {/* Extra Packaging */}
-        {parseFloat(order.extra_packaging_amount || '0') > 0 && (
+        {extraPackaging > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
             <strong>Extra Packaging:</strong>
-            <span>£{parseFloat(order.extra_packaging_amount || '0').toFixed(2)}</span>
+            <span>£{extraPackaging.toFixed(2)}</span>
           </div>
         )}
 
         {/* Final Total */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          fontSize: '16px', 
-          fontWeight: 'bold', 
-          marginTop: '10px', 
-          paddingTop: '10px', 
-          borderTop: '2px solid #000' 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          marginTop: '10px',
+          paddingTop: '10px',
+          borderTop: '2px solid #000',
         }}>
           <span>TOTAL:</span>
-          <span>£{parseFloat(order.order_amount || '0').toFixed(2)}</span>
+          <span>£{orderAmount.toFixed(2)}</span>
         </div>
 
-        {/* Payment Status */}
+        {/* Payment */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '13px' }}>
           <strong>Payment:</strong>
           <span style={{ fontWeight: 'bold' }}>
-            {order.payment_method === 'cash_on_delivery' ? 'UNPAID (COD)' : 'PAID'}
+            {order.payment_method === 'cash_on_delivery' && 'CASH ON DELIVERY (Unpaid)'}
+            {order.payment_method === 'digital_payment'  && 'PAID (Online)'}
+            {order.payment_method === 'wallet'           && 'PAID (Wallet)'}
+            {order.payment_method === 'offline_payment'  && 'CASH / OFFLINE'}
+            {order.payment_method === 'partial_payment'  && `PARTIAL — Cash: £${partiallyPaid.toFixed(2)}`}
+            {!['cash_on_delivery','digital_payment','wallet','offline_payment','partial_payment'].includes(order.payment_method || '') && (order.payment_method || 'N/A').toUpperCase()}
           </span>
         </div>
       </div>

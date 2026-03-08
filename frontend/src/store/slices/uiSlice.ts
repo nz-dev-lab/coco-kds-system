@@ -25,12 +25,11 @@ interface UIState {
       processingMode: 'buttons' | 'header';
       requireDoubleTap: boolean;
     };
-    // 🔮 EXAMPLE: Future setting (v3)
-    // notifications: {
-    //   desktop: boolean;
-    //   sound: boolean;
-    //   vibration: boolean;
-    // };
+    printer: {
+      selectedPrinterName: string | null;
+      paperWidth: 58 | 80;
+      autoPrint: boolean;
+    };
   };
   focusedOrderId: string | null;
   focusedOrderPosition: number | null;
@@ -40,11 +39,8 @@ interface UIState {
 // ============================================
 // ✅ STEP 1: INCREMENT THIS WHEN ADDING NEW SETTINGS
 // ============================================
-// Current version: 2 (added 'interaction' field)
-// When you add 'notifications' field → change to: 3
-// When you add 'printer' field → change to: 4
-// etc.
-const SETTINGS_VERSION = 3;
+// Current version: 4 (added 'printer' field)
+const SETTINGS_VERSION = 4;
 
 // ============================================
 // ✅ STEP 2: ADD NEW FIELDS HERE
@@ -67,12 +63,11 @@ const getDefaultSettings = (): UIState['settings'] => ({
     processingMode: 'buttons',
     requireDoubleTap: true,
   },
-  // 🔮 EXAMPLE: When adding new field, uncomment and increment SETTINGS_VERSION to 3:
-  // notifications: {
-  //   desktop: true,
-  //   sound: true,
-  //   vibration: false,
-  // },
+  printer: {
+    selectedPrinterName: null,
+    paperWidth: 80,
+    autoPrint: false,
+  },
 });
 
 // ============================================
@@ -110,27 +105,15 @@ const migrateSettings = (oldSettings: any, oldVersion: number): UIState['setting
     };
   }
 
-  // 🔮 EXAMPLE: Migration v3 → v4 (when you add 'notifications')
-  // Uncomment this when you actually add the notifications field:
-  //
-  // if (oldVersion < 3) {
-  //   console.log('📦 Migrating settings v2 → v3: Adding notifications field');
-  //   settings.notifications = {
-  //     desktop: true,
-  //     sound: true,
-  //     vibration: false,
-  //   };
-  // }
-
-  // 🔮 EXAMPLE: Migration v3 → v4 (if you add 'printer' later)
-  //
-  // if (oldVersion < 4) {
-  //   console.log('📦 Migrating settings v3 → v4: Adding printer field');
-  //   settings.printer = {
-  //     defaultPrinter: null,
-  //     autoPrint: false,
-  //   };
-  // }
+  // Migration v3 → v4: Added printer settings
+  if (oldVersion < 4) {
+    console.log('📦 Migrating settings v3 → v4: Adding printer settings');
+    settings.printer = {
+      selectedPrinterName: null,
+      paperWidth: 80,
+      autoPrint: false,
+    };
+  }
 
   return settings as UIState['settings'];
 };
@@ -323,6 +306,22 @@ const uiSlice = createSlice({
     // },
 
     // ========================================
+    // Printer Settings (saves to localStorage)
+    // ========================================
+    setSelectedPrinterName: (state, action: PayloadAction<string | null>) => {
+      state.settings.printer.selectedPrinterName = action.payload;
+      saveSettings(state.settings);
+    },
+    setPaperWidth: (state, action: PayloadAction<58 | 80>) => {
+      state.settings.printer.paperWidth = action.payload;
+      saveSettings(state.settings);
+    },
+    toggleAutoPrint: (state) => {
+      state.settings.printer.autoPrint = !state.settings.printer.autoPrint;
+      saveSettings(state.settings);
+    },
+
+    // ========================================
     // Reset Settings (saves to localStorage)
     // ========================================
     resetSettings: (state) => {
@@ -360,11 +359,10 @@ export const {
   setRequireDoubleTap,
   setItemNameFontSize,
   toggleItemNameUppercase,
+  setSelectedPrinterName,
+  setPaperWidth,
+  toggleAutoPrint,
   resetSettings,
-  // 🔮 EXAMPLE: Export new actions when you add them:
-  // toggleDesktopNotifications,
-  // toggleSoundNotifications,
-  // toggleVibration,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

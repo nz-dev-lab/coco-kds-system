@@ -363,9 +363,9 @@ ipcMain.on('install-update', () => {
 // PRINTER IPC HANDLERS
 ipcMain.handle('get-printers', async () => {
   try {
-    const win = BrowserWindow.getFocusedWindow();
+    const win = mainWindow ?? BrowserWindow.getFocusedWindow();
     if (!win) {
-      throw new Error('No focused window');
+      throw new Error('No window available');
     }
 
     const printers = await win.webContents.getPrintersAsync();
@@ -377,18 +377,14 @@ ipcMain.handle('get-printers', async () => {
   }
 });
 
-ipcMain.handle('print-order', async (event, orderHtml: string, printerName?: string) => {
+ipcMain.handle('print-order', async (event, orderHtml: string, printerName?: string, paperWidth?: 58 | 80) => {
+  let printWindow: BrowserWindow | null = null;
   try {
-    const win = BrowserWindow.getFocusedWindow();
-    if (!win) {
-      throw new Error('No focused window');
-    }
-
     console.log('🖨️ Printing order...');
     console.log('Selected printer:', printerName || 'Default');
 
     // Create a hidden window for printing
-    const printWindow = new BrowserWindow({
+    printWindow = new BrowserWindow({
       show: false,
       webPreferences: {
         nodeIntegration: false,
@@ -398,10 +394,9 @@ ipcMain.handle('print-order', async (event, orderHtml: string, printerName?: str
     // Load the HTML content
     await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(orderHtml)}`);
 
-    // compute dynamic height (in microns) based on rendered content
+    // Compute dynamic height (in microns) based on rendered content
     const contentHeightMicrons = await printWindow.webContents.executeJavaScript(`
       (function () {
-        // create a hidden 1mm element to measure px per mm
         const probe = document.createElement('div');
         probe.style.height = '1mm';
         probe.style.position = 'absolute';
@@ -409,61 +404,60 @@ ipcMain.handle('print-order', async (event, orderHtml: string, printerName?: str
         document.body.appendChild(probe);
         const pxPerMm = probe.getBoundingClientRect().height || 1;
         document.body.removeChild(probe);
-
-        // get content height in px
         const contentPx = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight);
-
-        // convert to microns (1 mm = 1000 microns)
         const heightMm = contentPx / pxPerMm;
-        return Math.ceil(heightMm * 1000); // microns - integer
+        return Math.ceil(heightMm * 1000);
       })();
     `) as number;
 
-    const pageWidthMicrons = 80000; // 80mm
+    const pageWidthMicrons = (paperWidth === 58 ? 58000 : 80000);
     const pageHeightMicrons = (typeof contentHeightMicrons === 'number' && contentHeightMicrons > 0)
-      ? Math.max(contentHeightMicrons, 80000) // ensure at least width as fallback
-      : 600000; // fallback (e.g. 600mm) if measurement fails
+      ? Math.max(contentHeightMicrons, 80000)
+      : 600000;
 
-    return new Promise((resolve, reject) => {
-      printWindow.webContents.print(
+    return new Promise((resolve) => {
+      printWindow!.webContents.print(
         {
-          silent: true, // Don't show print dialog
+          silent: true,
           printBackground: false,
-          deviceName: printerName || '', // Empty string uses default printer
-          margins: {
-            marginType: 'none', // No margins for thermal printers
-          },
+          deviceName: printerName || '',
+          margins: { marginType: 'none' },
           pageSize: {
-            width: pageWidthMicrons, // 80mm in microns (for thermal printers)
-            height: pageHeightMicrons, // provide height as required by Electron's Size type (use same as width for a square thermal page)
+            width: pageWidthMicrons,
+            height: pageHeightMicrons,
           },
         },
         (success, errorType) => {
-          printWindow.close();
+          printWindow!.close();
+          printWindow = null;
 
           if (success) {
             console.log('✅ Print job sent successfully');
             resolve({ success: true });
           } else {
             console.error('❌ Print failed:', errorType);
-            reject({ success: false, error: errorType });
+            resolve({ success: false, error: errorType });
           }
         }
       );
     });
   } catch (error) {
+    // Ensure window is always closed even if loadURL or executeJavaScript throws
+    if (printWindow && !printWindow.isDestroyed()) {
+      printWindow.close();
+    }
     console.error('❌ Print error:', error);
-    throw error;
+    return { success: false, error: String(error) };
   }
 });
 
 ipcMain.handle('get-default-printer', async () => {
   try {
-    const win = BrowserWindow.getFocusedWindow();
+    const win = mainWindow ?? BrowserWindow.getFocusedWindow();
     if (!win) {
-      throw new Error('No focused window');
+      throw new Error('No window available');
     }
-    
+
     const printers = await win.webContents.getPrintersAsync();
     const defaultPrinter = printers.find(p => p.isDefault);
     

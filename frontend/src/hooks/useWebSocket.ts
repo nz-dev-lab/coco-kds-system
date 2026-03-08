@@ -4,14 +4,23 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addOrder, updateOrder } from '../store/slices/ordersSlice';
 import { io, Socket } from 'socket.io-client';
 import { Order } from '@/types/order.type';
-import { audioNotificationService } from '../utils/audioNotifications';  // ✅ ADD THIS
-
+import { audioNotificationService } from '../utils/audioNotifications';
+import { usePrintOrder } from './usePrintOrder';
 
 export function useWebSocket() {
   const dispatch = useAppDispatch();
   const { token } = useAppSelector((state) => state.auth);
   const restaurantId = useAppSelector((state) => state.auth.restaurant?.id);
+  const autoPrint = useAppSelector((s) => s.ui.settings.printer?.autoPrint ?? false);
   const socketRef = useRef<Socket | null>(null);
+
+  const { printWithSelection } = usePrintOrder();
+
+  // Keep refs current so the socket event closure always has the latest values
+  const autoPrintRef = useRef(autoPrint);
+  autoPrintRef.current = autoPrint;
+  const printWithSelectionRef = useRef(printWithSelection);
+  printWithSelectionRef.current = printWithSelection;
 
   // Transform Laravel order format to frontend format
   const transformOrder = (rawOrder: any): Order | null => {
@@ -62,7 +71,7 @@ export function useWebSocket() {
           quantity: detail.quantity,
           price: detail.price.toString(),
           variant: detail.variant || null,
-          variation: variations,
+          variations: variations,
           add_ons: addOns,
           isReady: false,
         };
@@ -199,9 +208,15 @@ export function useWebSocket() {
       if (transformedOrder && transformedOrder.items && transformedOrder.items.length > 0) {
         console.log('✅ Order transformed successfully:', transformedOrder);
         dispatch(addOrder(transformedOrder));
-        
-        // ✅ ADD THIS - Play notification for new orders
         audioNotificationService.playNewOrderNotification();
+
+        // Auto-print if enabled in settings
+        if (autoPrintRef.current) {
+          console.log('🖨️ Auto-printing order:', transformedOrder.id);
+          printWithSelectionRef.current(transformedOrder).catch((err) => {
+            console.error('❌ Auto-print failed:', err);
+          });
+        }
       } else {
         console.error('❌ Order transformation failed or no items:', rawOrder);
       }

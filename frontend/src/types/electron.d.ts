@@ -21,6 +21,7 @@ export interface ElectronAPI {
   toggleFullscreen: () => void;
   isMaximized: () => Promise<boolean>;
   getAppVersion: () => Promise<string>;
+  platform: string;
   autoUpdater: {
     onUpdateAvailable: (callback: (info: any) => void) => void;
     onUpdateProgress: (callback: (progress: any) => void) => void;
@@ -39,7 +40,7 @@ export interface ElectronAPI {
   printer: {
     getPrinters: () => Promise<PrinterInfo[]>;
     getDefaultPrinter: () => Promise<PrinterInfo | null>;
-    printOrder: (orderHtml: string, printerName?: string) => Promise<PrintResult>;
+    printOrder: (orderHtml: string, printerName?: string, paperWidth?: 58 | 80) => Promise<PrintResult>;
   };
 }
 

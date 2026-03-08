@@ -16,14 +16,7 @@ import TMBillDebugPanel from './features/tmbill/components/TmbillDebugPanel';
 import { useTmbillOrders } from './hooks/useTmbillOrders';
 
 import History from './pages/History';
-
-// Temporary placeholder components
-const OrdersPage = () => (
-  <div className="p-6">
-    <h1 className="text-3xl font-bold text-slate-800">Orders</h1>
-    <p className="text-slate-600 mt-4">Coming soon...</p>
-  </div>
-);
+import Orders from './pages/Orders';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -62,7 +55,7 @@ function App() {
                   <Routes>
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/orders" element={<OrdersPage />} />
+                    <Route path="/orders" element={<Orders />} />
                     <Route path="/dispatch" element={<Dispatch />} />
                     <Route path="/foods" element={<Foods />} />
                     <Route path="/notifications" element={<Notifications />} />

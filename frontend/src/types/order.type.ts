@@ -10,13 +10,16 @@ export interface Order {
   order_amount: string;
   delivery_charge: string;
   total_tax_amount: string;
+  tax_status?: 'included' | 'excluded' | null;
   extra_packaging_amount?: string;
-  
+
   // Optional financial
   coupon_discount_amount?: string;
   restaurant_discount_amount?: string;
+  ref_bonus_amount?: string;
   dm_tips?: string;
   additional_charge?: string;
+  partially_paid_amount?: string;
   
   // Items
   items: OrderItem[];
@@ -52,7 +55,7 @@ export interface OrderItem {
   quantity: number;
   price: string;
   variant?: string | null;
-  variation: Array<{ type: string; name: string; price: string }>;
+  variations: Array<{ type: string; name: string; price: string }>;
   add_ons: Array<{ name: string; quantity: number; price: string }>;
   isReady?: boolean;         // ← Frontend only
 }

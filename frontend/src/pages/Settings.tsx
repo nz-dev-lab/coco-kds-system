@@ -1,5 +1,6 @@
 // src/pages/Settings.tsx
-import { Volume2, Mic, MicOff, Play, RotateCcw, Type, CaseSensitive } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Volume2, Mic, MicOff, Play, RotateCcw, Type, CaseSensitive, Printer, RefreshCw, Zap } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   toggleAudioNotifications,
@@ -11,14 +12,92 @@ import {
   setRequireDoubleTap,
   setItemNameFontSize,
   toggleItemNameUppercase,
+  setSelectedPrinterName,
+  setPaperWidth,
+  toggleAutoPrint,
 } from '../store/slices/uiSlice';
 import { audioNotificationService } from '../utils/audioNotifications';
+import { toast } from 'react-toastify';
+
+// ── Printer status helpers ────────────────────────────────────────────────────
+function printerStatusDot(status: number) {
+  if (status === 3) return { color: 'bg-green-500', label: 'Ready' };
+  if (status === 4) return { color: 'bg-amber-400', label: 'Printing' };
+  if (status === 5) return { color: 'bg-red-500', label: 'Offline' };
+  return { color: 'bg-slate-400', label: 'Unknown' };
+}
 
 export default function Settings() {
   const dispatch = useAppDispatch();
   const settings = useAppSelector((state) => state.ui.settings);
+  const printerSettings = settings.printer;
 
-  console.log('Current Settingss:', settings); // Debug log
+  // ── Printer section state ─────────────────────────────────────────────────
+  const [printerList, setPrinterList] = useState<any[]>([]);
+  const [loadingPrinters, setLoadingPrinters] = useState(false);
+  const [testPrinting, setTestPrinting] = useState(false);
+  const isElectron = typeof window !== 'undefined' && !!window.electron?.printer;
+
+  const loadPrinters = useCallback(async () => {
+    if (!isElectron) return;
+    setLoadingPrinters(true);
+    try {
+      const list = await window.electron.printer.getPrinters();
+      setPrinterList(list);
+    } catch {
+      setPrinterList([]);
+    } finally {
+      setLoadingPrinters(false);
+    }
+  }, [isElectron]);
+
+  useEffect(() => { loadPrinters(); }, [loadPrinters]);
+
+  const handleTestPrint = async () => {
+    if (!isElectron) return;
+    if (printerList.length === 0) {
+      toast.error('No printers found. Connect a printer and click Refresh first.');
+      return;
+    }
+    if (!printerSettings.selectedPrinterName) {
+      toast.warn('No printer selected. Click a printer in the list above to select it.');
+      return;
+    }
+    setTestPrinting(true);
+    try {
+      const testHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:monospace;font-size:12px;width:${printerSettings.paperWidth}mm;padding:5mm;}
+      </style></head><body>
+        <div style="text-align:center;border-bottom:2px dashed #000;padding-bottom:8px;margin-bottom:8px;">
+          <div style="font-size:18px;font-weight:bold;">CocoEats UK</div>
+          <div style="font-size:11px;margin-top:2px;">TEST PRINT</div>
+        </div>
+        <div style="margin-bottom:6px;">Paper width: ${printerSettings.paperWidth}mm</div>
+        <div style="margin-bottom:6px;">Printer: ${printerSettings.selectedPrinterName}</div>
+        <div style="margin-bottom:6px;">Time: ${new Date().toLocaleString('en-GB')}</div>
+        <div style="text-align:center;margin-top:10px;border-top:2px dashed #000;padding-top:8px;font-size:10px;">
+          If you can read this, printing works!
+        </div>
+      </body></html>`;
+      const result = await window.electron.printer.printOrder(
+        testHtml,
+        printerSettings.selectedPrinterName,
+        printerSettings.paperWidth,
+      );
+      if (result?.success) {
+        toast.success(`Test sent to ${printerSettings.selectedPrinterName} — check it printed correctly`);
+      } else {
+        console.error('Test print failed:', result?.error);
+        toast.error(`Test print failed: ${result?.error ?? 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Test print error:', err);
+      toast.error('Test print failed. Check the printer connection.');
+    } finally {
+      setTestPrinting(false);
+    }
+  };
 
   const handleTestReady = async () => {
     await audioNotificationService.testReadySound();
@@ -339,6 +418,148 @@ export default function Settings() {
             />
           </button>
         </div>
+      </div>
+
+      {/* Printer Settings Section */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+          <Printer className="w-5 h-5" />
+          Printer Settings
+        </h2>
+
+        {!isElectron && (
+          <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Printer settings are only available in the desktop app.
+          </p>
+        )}
+
+        {isElectron && (
+          <>
+            {/* Printer List */}
+            <div className="py-4 border-b">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="font-medium text-slate-800">Select Printer</p>
+                  <p className="text-sm text-slate-500">Choose which printer to use for receipts</p>
+                </div>
+                <button
+                  onClick={loadPrinters}
+                  disabled={loadingPrinters}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:hover:text-slate-200 disabled:opacity-50 transition-colors"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingPrinters ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+
+              {loadingPrinters && (
+                <div className="text-sm text-slate-400 py-2">Scanning for printers…</div>
+              )}
+
+              {!loadingPrinters && printerList.length === 0 && (
+                <div className="text-sm text-slate-400 py-2">
+                  No printers found. Make sure your printer is connected and try refreshing.
+                </div>
+              )}
+
+              {!loadingPrinters && printerList.length > 0 && (
+                <div className="space-y-2">
+                  {printerList.map((printer: any) => {
+                    const isSelected = printerSettings?.selectedPrinterName === printer.name;
+                    const dot = printerStatusDot(printer.status ?? 0);
+                    return (
+                      <button
+                        key={printer.name}
+                        onClick={() => dispatch(setSelectedPrinterName(isSelected ? null : printer.name))}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border-2 text-left transition-colors ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        {/* Status dot */}
+                        <div className="flex-shrink-0 flex items-center gap-1.5">
+                          <span className={`w-2.5 h-2.5 rounded-full ${dot.color}`} />
+                          <span className="text-xs text-slate-400 w-12">{dot.label}</span>
+                        </div>
+                        {/* Name */}
+                        <span className={`flex-1 text-sm font-medium ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}>
+                          {printer.name}
+                        </span>
+                        {/* Badges */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {printer.isDefault && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">Default</span>
+                          )}
+                          {isSelected && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium">Selected</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Paper Width */}
+            <div className="py-4 border-b">
+              <p className="font-medium text-slate-800 mb-1">Paper Width</p>
+              <p className="text-sm text-slate-500 mb-3">Match your thermal printer's paper roll width</p>
+              <div className="flex gap-2 w-48">
+                {([58, 80] as const).map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => dispatch(setPaperWidth(w))}
+                    className={`flex-1 py-2 rounded-lg border font-semibold text-sm transition-colors ${
+                      printerSettings?.paperWidth === w
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white border-slate-300 text-slate-600 hover:border-blue-400'
+                    }`}
+                  >
+                    {w}mm
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Auto-Print */}
+            <div className="flex items-center justify-between py-4 border-b">
+              <div className="flex items-center gap-3">
+                <Zap className="w-5 h-5 text-slate-500" />
+                <div>
+                  <p className="font-medium text-slate-800">Auto-Print New Orders</p>
+                  <p className="text-sm text-slate-500">Automatically print receipt when a new CocoEats order arrives</p>
+                </div>
+              </div>
+              <button
+                onClick={() => dispatch(toggleAutoPrint())}
+                className={`relative w-14 h-7 rounded-full transition-colors ${
+                  printerSettings?.autoPrint ? 'bg-green-500' : 'bg-slate-300'
+                }`}
+              >
+                <span className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
+                  printerSettings?.autoPrint ? 'translate-x-7' : 'translate-x-0'
+                }`} />
+              </button>
+            </div>
+
+            {/* Test Print */}
+            <div className="pt-4">
+              <p className="text-sm text-slate-600 mb-3">
+                Send a test receipt to verify your printer is working correctly.
+              </p>
+              <button
+                onClick={handleTestPrint}
+                disabled={testPrinting}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg transition-colors text-sm"
+              >
+                <Printer className="w-4 h-4" />
+                {testPrinting ? 'Sending test print…' : 'Print Test Receipt'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Reset Button */}
