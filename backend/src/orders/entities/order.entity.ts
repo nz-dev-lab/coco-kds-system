@@ -68,6 +68,9 @@ export class Order {
   @Column({ type: 'decimal', precision: 24, scale: 2, default: 0 })
   ref_bonus_amount: string;
 
+  @Column({ type: 'varchar', length: 191, nullable: true })
+  tax_status: string; // 'included' | 'excluded' | null
+
   @Column({ type: 'decimal', precision: 24, scale: 2, default: 0 })
   partially_paid_amount: string;
 

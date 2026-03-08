@@ -233,12 +233,15 @@ export class OrdersService {
       items: order.details.map((detail) => this.formatOrderDetail(detail)),
       item_count: order.details.reduce((sum, d) => sum + d.quantity, 0),
       delivery_charge: order.delivery_charge || '0.00',
-    total_tax_amount: order.total_tax_amount || '0.00',
-    coupon_discount_amount: order.coupon_discount_amount || '0.00',
-    restaurant_discount_amount: order.restaurant_discount_amount || '0.00',
-    dm_tips: order.dm_tips || '0.00',
-    additional_charge: order.additional_charge || '0.00',
-    extra_packaging_amount: order.extra_packaging_amount || '0.00',
+      total_tax_amount: order.total_tax_amount || '0.00',
+      tax_status: order.tax_status || 'included',
+      coupon_discount_amount: order.coupon_discount_amount || '0.00',
+      restaurant_discount_amount: order.restaurant_discount_amount || '0.00',
+      ref_bonus_amount: order.ref_bonus_amount || '0.00',
+      dm_tips: order.dm_tips || '0.00',
+      additional_charge: order.additional_charge || '0.00',
+      extra_packaging_amount: order.extra_packaging_amount || '0.00',
+      partially_paid_amount: order.partially_paid_amount || '0.00',
     };
   }
 
