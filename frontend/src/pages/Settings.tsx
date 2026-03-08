@@ -1,5 +1,5 @@
 // src/pages/Settings.tsx
-import { Volume2, VolumeX, Mic, MicOff, Play, RotateCcw } from 'lucide-react';
+import { Volume2, Mic, MicOff, Play, RotateCcw, Type, CaseSensitive } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   toggleAudioNotifications,
@@ -7,9 +7,10 @@ import {
   setSoundEffectsVolume,
   setVoiceVolume,
   resetSettings,
-  toggleRequireDoubleTap,
   setProcessingMode,
   setRequireDoubleTap,
+  setItemNameFontSize,
+  toggleItemNameUppercase,
 } from '../store/slices/uiSlice';
 import { audioNotificationService } from '../utils/audioNotifications';
 
@@ -272,24 +273,71 @@ export default function Settings() {
 
       {/* Display Settings Section */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold text-slate-800 mb-4">Display Settings</h2>
+        <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+          <Type className="w-5 h-5" />
+          Display Settings
+        </h2>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between py-2">
-            <div>
-              <p className="font-medium text-slate-800">Show Order Age</p>
-              <p className="text-sm text-slate-500">Display time elapsed since order placement</p>
-            </div>
-            <span className="text-sm text-slate-400 italic">Coming soon</span>
+        {/* Item Name Font Size */}
+        <div className="py-4 border-b">
+          <div className="mb-3">
+            <p className="font-medium text-slate-800">Item Name Font Size</p>
+            <p className="text-sm text-slate-500">
+              Larger sizes wrap to 2 lines so full names stay readable
+            </p>
           </div>
+          <div className="flex gap-2">
+            {(['sm', 'base', 'lg', 'xl'] as const).map((size) => {
+              const labels = { sm: 'S', base: 'M', lg: 'L', xl: 'XL' };
+              const preview = { sm: 'text-sm', base: 'text-base', lg: 'text-lg', xl: 'text-xl' };
+              const isActive = settings.display.itemNameFontSize === size;
+              return (
+                <button
+                  key={size}
+                  onClick={() => dispatch(setItemNameFontSize(size))}
+                  className={`flex-1 py-2 rounded-lg border font-semibold transition-colors ${preview[size]} ${
+                    isActive
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white border-slate-300 text-slate-600 hover:border-blue-400'
+                  }`}
+                >
+                  {labels[size]}
+                </button>
+              );
+            })}
+          </div>
+          {/* Live preview */}
+          <div className="mt-3 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200">
+            <span className="text-xs text-slate-400 block mb-1">Preview:</span>
+            <span className={`font-medium text-slate-800 ${
+              { sm: 'text-sm', base: 'text-base', lg: 'text-lg', xl: 'text-xl' }[settings.display.itemNameFontSize]
+            } ${settings.display.itemNameUppercase ? 'uppercase' : ''}`}>
+              2x Grilled Chicken Burger
+            </span>
+          </div>
+        </div>
 
-          <div className="flex items-center justify-between py-2">
+        {/* Item Name Capitalisation */}
+        <div className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-3">
+            <CaseSensitive className="w-5 h-5 text-slate-500" />
             <div>
-              <p className="font-medium text-slate-800">Auto Refresh</p>
-              <p className="text-sm text-slate-500">Automatically update order list</p>
+              <p className="font-medium text-slate-800">Uppercase Item Names</p>
+              <p className="text-sm text-slate-500">Display all item names in UPPERCASE</p>
             </div>
-            <span className="text-sm text-slate-400 italic">Coming soon</span>
           </div>
+          <button
+            onClick={() => dispatch(toggleItemNameUppercase())}
+            className={`relative w-14 h-7 rounded-full transition-colors ${
+              settings.display.itemNameUppercase ? 'bg-green-500' : 'bg-slate-300'
+            }`}
+          >
+            <span
+              className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
+                settings.display.itemNameUppercase ? 'translate-x-7' : 'translate-x-0'
+              }`}
+            />
+          </button>
         </div>
       </div>
 

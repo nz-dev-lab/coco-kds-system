@@ -17,6 +17,8 @@ interface UIState {
     display: {
       showOrderAge: boolean;
       autoRefresh: boolean;
+      itemNameFontSize: 'sm' | 'base' | 'lg' | 'xl';
+      itemNameUppercase: boolean;
     };
     requireDoubleTap: boolean;
     interaction: {
@@ -42,7 +44,7 @@ interface UIState {
 // When you add 'notifications' field → change to: 3
 // When you add 'printer' field → change to: 4
 // etc.
-const SETTINGS_VERSION = 2;
+const SETTINGS_VERSION = 3;
 
 // ============================================
 // ✅ STEP 2: ADD NEW FIELDS HERE
@@ -57,6 +59,8 @@ const getDefaultSettings = (): UIState['settings'] => ({
   display: {
     showOrderAge: true,
     autoRefresh: true,
+    itemNameFontSize: 'sm' as const,
+    itemNameUppercase: false,
   },
   requireDoubleTap: true,
   interaction: {
@@ -94,7 +98,19 @@ const migrateSettings = (oldSettings: any, oldVersion: number): UIState['setting
     };
   }
 
-  // 🔮 EXAMPLE: Migration v2 → v3 (when you add 'notifications')
+  // Migration v2 → v3: Added itemNameFontSize and itemNameUppercase
+  if (oldVersion < 3) {
+    console.log('📦 Migrating settings v2 → v3: Adding item name display settings');
+    settings.display = {
+      showOrderAge: true,
+      autoRefresh: true,
+      ...(settings.display ?? {}),
+      itemNameFontSize: 'sm',
+      itemNameUppercase: false,
+    };
+  }
+
+  // 🔮 EXAMPLE: Migration v3 → v4 (when you add 'notifications')
   // Uncomment this when you actually add the notifications field:
   //
   // if (oldVersion < 3) {
@@ -266,6 +282,14 @@ const uiSlice = createSlice({
       state.settings.display.autoRefresh = !state.settings.display.autoRefresh;
       saveSettings(state.settings);
     },
+    setItemNameFontSize: (state, action: PayloadAction<'sm' | 'base' | 'lg' | 'xl'>) => {
+      state.settings.display.itemNameFontSize = action.payload;
+      saveSettings(state.settings);
+    },
+    toggleItemNameUppercase: (state) => {
+      state.settings.display.itemNameUppercase = !state.settings.display.itemNameUppercase;
+      saveSettings(state.settings);
+    },
     toggleRequireDoubleTap: (state) => {
       state.settings.requireDoubleTap = !state.settings.requireDoubleTap;
       saveSettings(state.settings);
@@ -334,6 +358,8 @@ export const {
   toggleRequireDoubleTap,
   setProcessingMode,
   setRequireDoubleTap,
+  setItemNameFontSize,
+  toggleItemNameUppercase,
   resetSettings,
   // 🔮 EXAMPLE: Export new actions when you add them:
   // toggleDesktopNotifications,

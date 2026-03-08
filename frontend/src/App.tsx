@@ -15,17 +15,12 @@ import Help from './pages/Help';
 import TMBillDebugPanel from './features/tmbill/components/TmbillDebugPanel';
 import { useTmbillOrders } from './hooks/useTmbillOrders';
 
+import History from './pages/History';
+
 // Temporary placeholder components
 const OrdersPage = () => (
   <div className="p-6">
     <h1 className="text-3xl font-bold text-slate-800">Orders</h1>
-    <p className="text-slate-600 mt-4">Coming soon...</p>
-  </div>
-);
-
-const HistoryPage = () => (
-  <div className="p-6">
-    <h1 className="text-3xl font-bold text-slate-800">Order History</h1>
     <p className="text-slate-600 mt-4">Coming soon...</p>
   </div>
 );
@@ -71,7 +66,7 @@ function App() {
                     <Route path="/dispatch" element={<Dispatch />} />
                     <Route path="/foods" element={<Foods />} />
                     <Route path="/notifications" element={<Notifications />} />
-                    <Route path="/history" element={<HistoryPage />} />
+                    <Route path="/history" element={<History />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/help" element={<Help />} />
                     <Route path="/tmbill-debug" element={<TMBillDebugPanel />} />

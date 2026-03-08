@@ -21,8 +21,13 @@ export default function TmbillOrderCard({ order, gridPosition, isBumped = false 
   const dispatch = useAppDispatch();
   const currentTime = useCurrentTime();
 
-  const requireDoubleTap = useAppSelector((s) => s.ui.settings.interaction.requireDoubleTap);
-  const processingMode   = useAppSelector((s) => s.ui.settings.interaction.processingMode);
+  const requireDoubleTap = useAppSelector((s) => s.ui.settings.interaction?.requireDoubleTap ?? true);
+  const processingMode   = useAppSelector((s) => s.ui.settings.interaction?.processingMode ?? 'buttons');
+  const itemNameFontSize = useAppSelector((s) => s.ui.settings.display.itemNameFontSize ?? 'sm');
+  const itemNameUppercase = useAppSelector((s) => s.ui.settings.display.itemNameUppercase ?? false);
+
+  const itemNameFontClass: Record<string, string> = { sm: 'text-sm', base: 'text-base', lg: 'text-lg', xl: 'text-xl' };
+  const itemNameOverflowClass = (itemNameFontSize === 'lg' || itemNameFontSize === 'xl') ? 'line-clamp-2 break-words' : 'truncate';
   const focusedOrderId   = useAppSelector((s) => s.ui.focusedOrderId);
   const recentlyUpdatedIds = useAppSelector((s) => s.ui.recentlyUpdatedOrderIds);
   const isNewOrder = useAppSelector((s) => s.orders.newOrderIds.includes(order.id));
@@ -447,9 +452,10 @@ export default function TmbillOrderCard({ order, gridPosition, isBumped = false 
                       {item.quantity}x
                     </span>
                     <span className={`
-                      text-sm font-medium
+                      ${itemNameFontClass[itemNameFontSize]} font-medium
                       ${item.isReady ? 'line-through text-slate-400' : 'text-slate-800'}
-                      truncate
+                      ${itemNameOverflowClass}
+                      ${itemNameUppercase ? 'uppercase' : ''}
                     `}>
                       {item.name}
                     </span>

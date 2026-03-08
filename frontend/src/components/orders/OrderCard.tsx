@@ -76,8 +76,13 @@ export default function OrderCard({ order, gridPosition, isBumped = false }: Ord
 
   // Get restaurant ID from Redux auth state
   const restaurantId = useAppSelector((state) => state.auth.restaurant?.id);
-  const requireDoubleTap = useAppSelector((s) => s.ui.settings.interaction.requireDoubleTap);
-  const processingMode = useAppSelector((s) => s.ui.settings.interaction.processingMode);
+  const requireDoubleTap = useAppSelector((s) => s.ui.settings.interaction?.requireDoubleTap ?? true);
+  const processingMode = useAppSelector((s) => s.ui.settings.interaction?.processingMode ?? 'buttons');
+  const itemNameFontSize = useAppSelector((s) => s.ui.settings.display.itemNameFontSize ?? 'sm');
+  const itemNameUppercase = useAppSelector((s) => s.ui.settings.display.itemNameUppercase ?? false);
+
+  const itemNameFontClass: Record<string, string> = { sm: 'text-sm', base: 'text-base', lg: 'text-lg', xl: 'text-xl' };
+  const itemNameOverflowClass = (itemNameFontSize === 'lg' || itemNameFontSize === 'xl') ? 'line-clamp-2 break-words' : 'truncate';
   const focusedOrderId = useAppSelector((state) => state.ui.focusedOrderId);
   const recentlyUpdatedIds = useAppSelector((state) => state.ui.recentlyUpdatedOrderIds);
   const isFocused = order.id === focusedOrderId;
@@ -684,9 +689,10 @@ return (
                 <div className="flex items-baseline gap-2">
                   <span className="font-bold text-slate-900 font-mono text-sm flex-shrink-0">{item.quantity}x</span>
                   <span className={`
-                    text-sm font-medium 
+                    ${itemNameFontClass[itemNameFontSize]} font-medium
                     ${item.isReady ? 'line-through text-slate-400' : 'text-slate-800'}
-                    truncate
+                    ${itemNameOverflowClass}
+                    ${itemNameUppercase ? 'uppercase' : ''}
                   `}>
                     {item.name}
                   </span>

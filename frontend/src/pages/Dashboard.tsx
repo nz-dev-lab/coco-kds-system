@@ -1,14 +1,130 @@
 // src/pages/Dashboard.tsx
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchOrders, selectAllActiveOrders, selectTmbillConnected, selectTmbillBumpedOrders, selectCocoeatsBumpedOrders } from '../store/slices/ordersSlice';
 import OrderCard from '../components/orders/OrderCard';
 import TmbillOrderCard from '../components/orders/TmbillOrderCard';
 import { runTmbillAutoConnect } from '@/hooks/useTmbillOrders';
-import { RefreshCw, Clock, Wifi, WifiOff, ScanSearch, ChevronDown, ChevronUp } from 'lucide-react';
+import { RefreshCw, Clock, Wifi, WifiOff, ScanSearch, ChevronDown, ChevronUp, ShoppingBag, DollarSign, TrendingUp } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useLiveClock } from '../hooks/useLiveClock';
 import { clearRecentlyUpdated, releaseFocus } from '@/store/slices/uiSlice';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { format, parseISO } from 'date-fns';
+
+// ── Today's Summary mini-widget ──────────────────────────────────────────────
+
+interface TodayStats {
+  total_orders: number;
+  total_revenue: number;
+  avg_prep_time: number;
+}
+
+interface TrendPoint { date: string; Revenue: number; Orders: number; }
+
+function TodaySummary({ restaurantId }: { restaurantId: string }) {
+  const [stats, setStats] = useState<TodayStats | null>(null);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [show, setShow] = useState(false);
+  const isElectron = typeof window !== 'undefined' && !!window.electron?.database;
+
+  const load = useCallback(async () => {
+    if (!isElectron || !restaurantId) return;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const [sRes, tRes] = await Promise.all([
+      window.electron.database.getDailyStats(today, restaurantId),
+      window.electron.database.getRevenueTrend(7, restaurantId),
+    ]);
+    if (sRes.success && sRes.data) setStats(sRes.data);
+    if (tRes.success && tRes.data) {
+      setTrend((tRes.data as any[]).map(t => ({
+        date: t.date ? format(parseISO(t.date), 'MMM d') : '',
+        Revenue: Math.round(t.revenue ?? 0),
+        Orders: t.orders,
+      })));
+    }
+  }, [isElectron, restaurantId]);
+
+  useEffect(() => { load(); }, [load]);
+  if (!isElectron || !restaurantId) return null;
+
+  return (
+    <div className="border-t border-slate-100 dark:border-kds-border bg-white dark:bg-kds-bg-secondary">
+      <button
+        onClick={() => setShow(v => !v)}
+        className="w-full flex items-center justify-between px-6 py-2 hover:bg-slate-50 dark:hover:bg-kds-surface transition-colors"
+      >
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-kds-text-muted uppercase tracking-wide">
+          <TrendingUp className="w-3.5 h-3.5" />
+          Today at a Glance
+        </div>
+        {show ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+      </button>
+
+      {show && (
+        <div className="px-6 pb-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Stat pills */}
+          <div className="flex gap-3 flex-wrap lg:col-span-1 items-start content-start">
+            <div className="flex items-center gap-2 bg-blue-50 dark:bg-kds-surface rounded-lg px-3 py-2">
+              <ShoppingBag className="w-4 h-4 text-blue-600" />
+              <div>
+                <p className="text-xs text-slate-400 dark:text-kds-text-muted">Orders</p>
+                <p className="text-lg font-bold text-blue-600">{stats?.total_orders ?? '—'}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 bg-green-50 dark:bg-kds-surface rounded-lg px-3 py-2">
+              <DollarSign className="w-4 h-4 text-green-600" />
+              <div>
+                <p className="text-xs text-slate-400 dark:text-kds-text-muted">Revenue</p>
+                <p className="text-lg font-bold text-green-600">
+                  {stats ? stats.total_revenue.toLocaleString('en-GB', { style: 'currency', currency: 'GBP' }) : '—'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 bg-orange-50 dark:bg-kds-surface rounded-lg px-3 py-2">
+              <Clock className="w-4 h-4 text-orange-600" />
+              <div>
+                <p className="text-xs text-slate-400 dark:text-kds-text-muted">Avg Prep</p>
+                <p className="text-lg font-bold text-orange-600">
+                  {stats?.avg_prep_time ? `${Math.round(stats.avg_prep_time)}m` : '—'}
+                </p>
+              </div>
+            </div>
+          </div>
+          {/* Sparkline */}
+          <div className="lg:col-span-2 h-20">
+            {trend.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trend} margin={{ top: 2, right: 2, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="spark" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis hide />
+                  <Tooltip
+                    contentStyle={{ fontSize: 11, padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: 8 }}
+                    formatter={(v: any) => [Number(v).toLocaleString('en-GB', { style: 'currency', currency: 'GBP' }), 'Revenue']}
+                  />
+                  <Area type="monotone" dataKey="Revenue" stroke="#3b82f6" strokeWidth={2} fill="url(#spark)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-xs text-slate-300 dark:text-kds-text-muted">
+                No trend data yet
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const dispatch = useAppDispatch();
@@ -27,6 +143,8 @@ export default function Dashboard() {
   const tmbillBumpedOrders = useAppSelector(selectTmbillBumpedOrders);
   const cocoeatsBumpedOrders = useAppSelector(selectCocoeatsBumpedOrders);
   const allBumpedCount = tmbillBumpedOrders.length + cocoeatsBumpedOrders.length;
+  const restaurant = useAppSelector((state) => state.auth.restaurant);
+  const restaurantId: string = restaurant?.id ?? restaurant?._id ?? '';
   const [tmbillScanning, setTmbillScanning] = useState(false);
   const [showBumped, setShowBumped] = useState(false);
 
@@ -239,6 +357,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Today's Summary (collapsible) */}
+      <TodaySummary restaurantId={restaurantId} />
 
       {/* Error State */}
       {error && (
