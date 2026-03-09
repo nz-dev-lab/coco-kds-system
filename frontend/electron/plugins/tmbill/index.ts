@@ -182,19 +182,36 @@ export class TMBillPlugin {
         });
 
         this.state.connected = true;
-        this.log('✅ All listeners active. Fetching initial orders...', 'success');
+        this.log('✅ All listeners active. Fetching initial orders + menu...', 'success');
 
-        // Initial fetch — sends tmbill:orders-refreshed to renderer immediately
-        const { tables, settledOrders } = await this.connection.fetchRunningTables();
+        // Initial fetch — orders + menu in parallel
+        const [{ tables, settledOrders }, { items: menuItems }] = await Promise.all([
+          this.connection.fetchRunningTables(),
+          this.connection.fetchMenu(),
+        ]);
         const transformedOrders = tables.map(t => transformTMBillRunningTable(t));
         this.sendToRenderer('tmbill:orders-refreshed', { running: transformedOrders, settled: settledOrders });
-        this.log(`📋 Initial fetch: ${transformedOrders.length} running, ${settledOrders.length} settled`, 'success');
+        this.sendToRenderer('tmbill:menu-refreshed', { items: menuItems });
+        this.log(`📋 Initial fetch: ${transformedOrders.length} running, ${settledOrders.length} settled, ${menuItems.length} menu items`, 'success');
 
         return { success: true, connected: this.connection.isConnected() };
       } catch (error: any) {
         this.state.lastError = error.message;
         this.state.connected = false;
         this.log(`❌ Connection failed: ${error.message}`, 'error');
+        return { success: false, error: error.message };
+      }
+    });
+
+    // ── Fetch Menu (manual refresh / initial load) ────────────────────────
+    ipcMain.handle('tmbill:fetch-menu', async () => {
+      this.log('📋 Fetching TMBILL menu...', 'info');
+      try {
+        const { items } = await this.connection.fetchMenu();
+        this.sendToRenderer('tmbill:menu-refreshed', { items });
+        return { success: true, count: items.length };
+      } catch (error: any) {
+        this.log(`❌ Menu fetch failed: ${error.message}`, 'error');
         return { success: false, error: error.message };
       }
     });

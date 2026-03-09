@@ -13,6 +13,13 @@ export interface TMBillPluginConfig {
   autoConnect: boolean;
 }
 
+export interface TmbillMenuItem {
+  item_id: number;
+  item_refid: number;
+  title: string;
+  active: number;
+}
+
 export interface TMBillPluginState {
   initialized: boolean;
   discovering: boolean;

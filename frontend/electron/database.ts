@@ -264,7 +264,7 @@ db.exec(`
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
     name     TEXT NOT NULL UNIQUE,
     category TEXT,
-    station_id INTEGER,           -- FK to stations (null until routed)
+    station_id INTEGER,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -272,18 +272,11 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS cocoeats_item_map (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     food_id           TEXT NOT NULL UNIQUE,
-    food_name         TEXT NOT NULL,   -- denormalised for display
+    food_name         TEXT NOT NULL,
     canonical_item_id INTEGER NOT NULL REFERENCES canonical_items(id) ON DELETE CASCADE
   );
 
-  -- TMBILL item name → canonical item (name-based, no stable ID in TMBILL)
-  CREATE TABLE IF NOT EXISTS tmbill_item_map (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    item_name         TEXT NOT NULL UNIQUE,
-    canonical_item_id INTEGER NOT NULL REFERENCES canonical_items(id) ON DELETE CASCADE
-  );
-
-  -- Kitchen stations (station routing — tables ready, UI comes later)
+  -- Kitchen stations (stub for future routing UI)
   CREATE TABLE IF NOT EXISTS stations (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL UNIQUE,
@@ -293,6 +286,28 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_ce_map_canonical ON cocoeats_item_map(canonical_item_id);
+`);
+
+// ── tmbill_item_map migration: old schema used item_name as UNIQUE key;
+//    new schema uses item_id (stable integer from TMBILL POS menu endpoint).
+//    Detect old schema and migrate — safe because no real production data yet.
+{
+  const cols = (db.prepare("PRAGMA table_info(tmbill_item_map)").all() as any[]);
+  const hasItemId = cols.some((c: any) => c.name === 'item_id');
+  if (cols.length > 0 && !hasItemId) {
+    db.exec('DROP TABLE IF EXISTS tmbill_item_map;');
+    console.log('⚠️  tmbill_item_map migrated to item_id-based schema (old name-based data cleared)');
+  }
+}
+
+db.exec(`
+  -- TMBILL item_id → canonical item (stable ID from /menu endpoint)
+  CREATE TABLE IF NOT EXISTS tmbill_item_map (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id           INTEGER NOT NULL UNIQUE,
+    item_name         TEXT    NOT NULL,
+    canonical_item_id INTEGER NOT NULL REFERENCES canonical_items(id) ON DELETE CASCADE
+  );
   CREATE INDEX IF NOT EXISTS idx_tb_map_canonical ON tmbill_item_map(canonical_item_id);
 `);
 
@@ -306,7 +321,7 @@ const mappingStatements = {
       c.id, c.name, c.category, c.station_id, c.created_at,
       (SELECT json_group_array(json_object('id', m.id, 'food_id', m.food_id, 'food_name', m.food_name))
        FROM cocoeats_item_map m WHERE m.canonical_item_id = c.id) AS cocoeats_maps,
-      (SELECT json_group_array(json_object('id', t.id, 'item_name', t.item_name))
+      (SELECT json_group_array(json_object('id', t.id, 'item_id', t.item_id, 'item_name', t.item_name))
        FROM tmbill_item_map t WHERE t.canonical_item_id = c.id) AS tmbill_maps
     FROM canonical_items c
     ORDER BY c.name ASC
@@ -334,12 +349,12 @@ const mappingStatements = {
   `),
 
   addTmbillMap: db.prepare(`
-    INSERT OR REPLACE INTO tmbill_item_map (item_name, canonical_item_id)
-    VALUES (?, ?)
+    INSERT OR REPLACE INTO tmbill_item_map (item_id, item_name, canonical_item_id)
+    VALUES (?, ?, ?)
   `),
 
   removeTmbillMap: db.prepare(`
-    DELETE FROM tmbill_item_map WHERE item_name = ?
+    DELETE FROM tmbill_item_map WHERE item_id = ?
   `),
 
   lookupByFoodId: db.prepare(`
@@ -348,10 +363,10 @@ const mappingStatements = {
     WHERE m.food_id = ?
   `),
 
-  lookupByTmbillName: db.prepare(`
+  lookupByTmbillItemId: db.prepare(`
     SELECT c.* FROM canonical_items c
     JOIN tmbill_item_map t ON t.canonical_item_id = c.id
-    WHERE t.item_name = ?
+    WHERE t.item_id = ?
   `),
 };
 
@@ -418,18 +433,18 @@ export function removeCocoeatsMap(foodId: string) {
   }
 }
 
-export function addTmbillMap(itemName: string, canonicalItemId: number) {
+export function addTmbillMap(itemId: number, itemName: string, canonicalItemId: number) {
   try {
-    mappingStatements.addTmbillMap.run(itemName, canonicalItemId);
+    mappingStatements.addTmbillMap.run(itemId, itemName, canonicalItemId);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
 }
 
-export function removeTmbillMap(itemName: string) {
+export function removeTmbillMap(itemId: number) {
   try {
-    mappingStatements.removeTmbillMap.run(itemName);
+    mappingStatements.removeTmbillMap.run(itemId);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };

@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { TMBillService } from './types';
+import type { TMBillService, TmbillMenuItem } from './types';
 import type { 
   TMBillRunningTable, 
   TMBillKotSavedPayload, 
@@ -381,5 +381,58 @@ export class TMBillConnection {
 
   getBaseUrl(): string | null {
     return this.baseUrl;
+  }
+
+  async fetchMenu(): Promise<{ items: TmbillMenuItem[] }> {
+    if (!this.baseUrl || !this.token || !this.storeId) {
+      this.log(`❌ Cannot fetch menu: baseUrl=${this.baseUrl} token=${!!this.token} storeId=${this.storeId}`, 'error');
+      return { items: [] };
+    }
+    try {
+      // Try candidate paths in order — stop at the first that doesn't return status 404
+      const storeIdToUse = this.storeId || this.tmposId;
+      const candidates = [
+        `${this.baseUrl}api/kds/menu?store_id=${storeIdToUse}`,
+        `${this.baseUrl}api/menu?store_id=${storeIdToUse}`,
+        `${this.baseUrl}menu?store_id=${storeIdToUse}`,
+      ];
+
+      let rawText = '';
+      let json: any = null;
+
+      for (const url of candidates) {
+        this.log(`📋 Trying: GET ${url}`, 'info');
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${this.token}` } });
+        rawText = await res.text();
+        console.log(`[TMBILL fetchMenu] ${url} → HTTP ${res.status} | ${rawText}`);
+        json = JSON.parse(rawText);
+        if (json?.status !== 404) break;
+      }
+
+      // Handle multiple possible response shapes from TMBILL
+      let rawItems: any[] | null = null;
+      if (Array.isArray(json?.data?.items))       rawItems = json.data.items;      // { data: { items: [] } }
+      else if (Array.isArray(json?.data))          rawItems = json.data;            // { data: [] }
+      else if (Array.isArray(json?.items))         rawItems = json.items;           // { items: [] }
+      else if (Array.isArray(json))                rawItems = json;                 // []
+
+      if (rawItems) {
+        const items: TmbillMenuItem[] = rawItems
+          .filter(i => i.active !== 0)
+          .map(i => ({
+            item_id:    i.item_id,
+            item_refid: i.item_refid ?? 0,
+            title:      i.title ?? i.item_name ?? 'Unknown',
+            active:     i.active ?? 1,
+          }));
+        this.log(`✅ Fetched ${items.length} menu items`, 'success');
+        return { items };
+      }
+      this.log(`⚠️ Menu fetch: unrecognised response shape (status ${json?.status})`, 'error');
+      return { items: [] };
+    } catch (error: any) {
+      this.log(`❌ Menu fetch error: ${error.message}`, 'error');
+      return { items: [] };
+    }
   }
 }
