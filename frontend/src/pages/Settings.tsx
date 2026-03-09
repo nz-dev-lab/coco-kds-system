@@ -36,7 +36,26 @@ export default function Settings() {
   const [printerList, setPrinterList] = useState<any[]>([]);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [testPrinting, setTestPrinting] = useState(false);
+  const [ipInput, setIpInput] = useState('');
+  const [printerIps, setPrinterIps] = useState<Record<string, string>>({});
+  const [resolvingIps, setResolvingIps] = useState(false);
   const isElectron = typeof window !== 'undefined' && !!window.electron?.printer;
+  const isWindows = window.electron?.platform === 'win32';
+
+  const resolveNetworkIps = useCallback(async (printers: any[]) => {
+    if (!isWindows || !window.electron?.printer?.getPrinterIp) return;
+    setResolvingIps(true);
+    setPrinterIps({});
+    await Promise.all(printers.map(async (p) => {
+      try {
+        const res = await window.electron.printer.getPrinterIp(p.name);
+        if (res.success && res.ip) {
+          setPrinterIps(prev => ({ ...prev, [p.name]: res.ip! }));
+        }
+      } catch {}
+    }));
+    setResolvingIps(false);
+  }, [isWindows]);
 
   const loadPrinters = useCallback(async () => {
     if (!isElectron) return;
@@ -44,27 +63,55 @@ export default function Settings() {
     try {
       const list = await window.electron.printer.getPrinters();
       setPrinterList(list);
+      resolveNetworkIps(list);
     } catch {
       setPrinterList([]);
     } finally {
       setLoadingPrinters(false);
     }
-  }, [isElectron]);
+  }, [isElectron, resolveNetworkIps]);
 
   useEffect(() => { loadPrinters(); }, [loadPrinters]);
 
   const handleTestPrint = async () => {
     if (!isElectron) return;
-    if (printerList.length === 0) {
-      toast.error('No printers found. Connect a printer and click Refresh first.');
-      return;
-    }
-    if (!printerSettings.selectedPrinterName) {
-      toast.warn('No printer selected. Click a printer in the list above to select it.');
+    if (!printerSettings?.selectedPrinterName) {
+      toast.warn('No printer selected. Select a printer or enter an IP address above.');
       return;
     }
     setTestPrinting(true);
+    const printerName = printerSettings.selectedPrinterName;
+    const isIp = /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(printerName);
     try {
+      // IP-based printer → ESC/POS TCP (bypasses CUPS)
+      if (isIp && window.electron?.printer?.printOrderEscpos) {
+        const result = await window.electron.printer.printOrderEscpos(
+          {
+            orderNumber:    'TEST',
+            restaurantName: 'CocoEats UK',
+            orderType:      'TEST PRINT',
+            customerName:   '',
+            items: [{ name: 'If you can read this, printing works!', quantity: 1 }],
+            totalAmount:    '0',
+            createdAt:      new Date().toISOString(),
+            paperWidth:     printerSettings.paperWidth as 58 | 80,
+          },
+          printerName,
+        );
+        if (result?.success) {
+          toast.success(`Test sent to ${printerName} — check it printed correctly`);
+        } else {
+          console.error('ESC/POS test print failed:', result?.error);
+          toast.error(`Test print failed: ${result?.error ?? 'Unknown error'}`);
+        }
+        return;
+      }
+
+      // Regular CUPS/Windows printer → HTML path
+      if (printerList.length === 0) {
+        toast.error('No printers found. Connect a printer and click Refresh first.');
+        return;
+      }
       const testHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
         *{margin:0;padding:0;box-sizing:border-box;}
         body{font-family:monospace;font-size:12px;width:${printerSettings.paperWidth}mm;padding:5mm;}
@@ -74,19 +121,15 @@ export default function Settings() {
           <div style="font-size:11px;margin-top:2px;">TEST PRINT</div>
         </div>
         <div style="margin-bottom:6px;">Paper width: ${printerSettings.paperWidth}mm</div>
-        <div style="margin-bottom:6px;">Printer: ${printerSettings.selectedPrinterName}</div>
+        <div style="margin-bottom:6px;">Printer: ${printerName}</div>
         <div style="margin-bottom:6px;">Time: ${new Date().toLocaleString('en-GB')}</div>
         <div style="text-align:center;margin-top:10px;border-top:2px dashed #000;padding-top:8px;font-size:10px;">
           If you can read this, printing works!
         </div>
       </body></html>`;
-      const result = await window.electron.printer.printOrder(
-        testHtml,
-        printerSettings.selectedPrinterName,
-        printerSettings.paperWidth,
-      );
+      const result = await window.electron.printer.printOrder(testHtml, printerName, printerSettings.paperWidth);
       if (result?.success) {
-        toast.success(`Test sent to ${printerSettings.selectedPrinterName} — check it printed correctly`);
+        toast.success(`Test sent to ${printerName} — check it printed correctly`);
       } else {
         console.error('Test print failed:', result?.error);
         toast.error(`Test print failed: ${result?.error ?? 'Unknown error'}`);
@@ -452,8 +495,10 @@ export default function Settings() {
                 </button>
               </div>
 
-              {loadingPrinters && (
-                <div className="text-sm text-slate-400 py-2">Scanning for printers…</div>
+              {(loadingPrinters || resolvingIps) && (
+                <div className="text-sm text-slate-400 py-2">
+                  {loadingPrinters ? 'Scanning for printers…' : 'Resolving network IPs…'}
+                </div>
               )}
 
               {!loadingPrinters && printerList.length === 0 && (
@@ -488,6 +533,11 @@ export default function Settings() {
                         </span>
                         {/* Badges */}
                         <div className="flex items-center gap-2 flex-shrink-0">
+                          {printerIps[printer.name] && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-mono">
+                              {printerIps[printer.name]}
+                            </span>
+                          )}
                           {printer.isDefault && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">Default</span>
                           )}
@@ -500,6 +550,41 @@ export default function Settings() {
                   })}
                 </div>
               )}
+
+              {/* Direct IP entry (Linux ESC/POS TCP printing) */}
+              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Direct IP Printer</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">
+                  For thermal printers connected over the network (ESC/POS via TCP). Enter the printer's IP address, e.g. <span className="font-mono">192.168.1.167</span> or <span className="font-mono">192.168.1.167:9100</span>
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={ipInput}
+                    onChange={e => setIpInput(e.target.value)}
+                    placeholder="e.g. 192.168.1.167"
+                    className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                  />
+                  <button
+                    onClick={() => {
+                      const val = ipInput.trim();
+                      if (!val) return;
+                      dispatch(setSelectedPrinterName(val));
+                      setIpInput('');
+                      toast.success(`Printer set to ${val}`);
+                    }}
+                    disabled={!ipInput.trim()}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                  >
+                    Use
+                  </button>
+                </div>
+                {printerSettings?.selectedPrinterName && /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(printerSettings.selectedPrinterName) && (
+                  <p className="mt-2 text-xs text-blue-600 font-mono">
+                    ✓ Active: {printerSettings.selectedPrinterName}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Paper Width */}

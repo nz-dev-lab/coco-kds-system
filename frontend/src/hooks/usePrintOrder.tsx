@@ -96,6 +96,67 @@ export const usePrintOrder = () => {
       try {
         console.log('🖨️ Printing order:', order.id, '| Printer:', targetPrinterName || 'Default', '| Width:', paperWidth + 'mm');
 
+        // ── ESC/POS path: use direct TCP when printer is IP, or when Windows can resolve the IP ──
+        const hasEscpos = typeof window.electron?.printer?.printOrderEscpos === 'function';
+        let escposPrinterAddress: string | null = null;
+        if (hasEscpos && targetPrinterName) {
+          const looksLikeIp = /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(targetPrinterName);
+          if (looksLikeIp) {
+            escposPrinterAddress = targetPrinterName;
+          } else if (window.electron?.printer?.getPrinterIp) {
+            // Windows: resolve printer IP from its name via WMI
+            const res = await window.electron.printer.getPrinterIp(targetPrinterName);
+            if (res.success && res.ip) {
+              console.log(`🖨️ Resolved "${targetPrinterName}" → ${res.ip} (ESC/POS mode)`);
+              escposPrinterAddress = res.ip;
+            }
+          }
+        }
+        console.log('[ESC/POS] escposPrinterAddress:', escposPrinterAddress);
+        if (escposPrinterAddress && hasEscpos) {
+          const escposData = {
+            orderNumber:    order.id,
+            restaurantName: restaurantName ?? '',
+            orderType:      order.order_type,
+            customerName:   order.customer_name ?? '',
+            scheduleAt:     order.schedule_at ?? undefined,
+            orderNote:      order.order_note ?? undefined,
+            paymentMethod:  order.payment_method ?? undefined,
+            deliveryAddress: order.delivery_address ? {
+              name:    order.delivery_address.contact_person_name ?? '',
+              phone:   order.delivery_address.contact_person_number ?? undefined,
+              address: order.delivery_address.address ?? undefined,
+            } : undefined,
+            items: order.items.map(item => ({
+              name:       item.name,
+              quantity:   item.quantity,
+              price:      item.price,
+              variations: item.variations?.map(v => ({ type: (v as any).type ?? '', name: v.name })),
+              addOns:     item.add_ons?.map(a => ({ name: a.name, quantity: a.quantity, price: a.price })),
+            })),
+            totalAmount:        order.order_amount,
+            deliveryCharge:     order.delivery_charge,
+            dmTips:             order.dm_tips,
+            additionalCharge:   order.additional_charge,
+            extraPackaging:     order.extra_packaging_amount,
+            couponDiscount:     order.coupon_discount_amount,
+            restaurantDiscount: order.restaurant_discount_amount,
+            refBonus:           order.ref_bonus_amount,
+            totalTax:           order.total_tax_amount,
+            taxStatus:          order.tax_status,
+            partiallyPaid:      order.partially_paid_amount,
+            createdAt:          order.created_at,
+            paperWidth:         paperWidth as 58 | 80,
+          };
+          const result = await window.electron.printer.printOrderEscpos(escposData, escposPrinterAddress!);
+          if (result.success) {
+            toast.success(`Sent to ${escposPrinterAddress}`);
+          } else {
+            toast.error(`ESC/POS print failed: ${result.error}`);
+          }
+          return result;
+        }
+
         const printHtml = renderToStaticMarkup(
           <html>
             <head>

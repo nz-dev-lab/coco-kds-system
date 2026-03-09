@@ -1,4 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+const execAsync = promisify(exec);
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
 import {
@@ -20,6 +23,7 @@ import {
 } from './database';
 import { TMBillPlugin } from './plugins/tmbill';
 import { readAppConfig, writeAppConfig } from './appConfig';
+import { buildEscPosReceipt, sendToTcpPrinter, parsePrinterAddress } from './escpos';
 
 
 let mainWindow: BrowserWindow | null = null;
@@ -373,12 +377,12 @@ ipcMain.handle('mapping:remove-cocoeats-map', (_e, foodId: string) =>
   removeCocoeatsMap(foodId)
 );
 
-ipcMain.handle('mapping:add-tmbill-map', (_e, itemName: string, canonicalItemId: number) =>
-  addTmbillMap(itemName, canonicalItemId)
+ipcMain.handle('mapping:add-tmbill-map', (_e, itemId: number, itemName: string, canonicalItemId: number) =>
+  addTmbillMap(itemId, itemName, canonicalItemId)
 );
 
-ipcMain.handle('mapping:remove-tmbill-map', (_e, itemName: string) =>
-  removeTmbillMap(itemName)
+ipcMain.handle('mapping:remove-tmbill-map', (_e, itemId: number) =>
+  removeTmbillMap(itemId)
 );
 
 // ⭐ AUTO-UPDATE USER ACTIONS
@@ -417,15 +421,64 @@ ipcMain.handle('get-printers', async () => {
   }
 });
 
+// ── Resolve printer IP from Windows printer name (WMI) ───────────────────────
+ipcMain.handle('get-printer-ip', async (_event, printerName: string) => {
+  if (process.platform !== 'win32') return { success: false };
+  try {
+    // Escape single quotes for PowerShell
+    const safeName = printerName.replace(/'/g, "''");
+    // Step 1: get the port name assigned to this printer
+    const { stdout: portOut } = await execAsync(
+      `powershell -NoProfile -Command "Get-WmiObject Win32_Printer -Filter \\"Name='${safeName}'\\\" | Select-Object -ExpandProperty PortName"`,
+      { timeout: 6000 }
+    );
+    const portName = portOut.trim();
+    if (!portName) return { success: false };
+    // Step 2: resolve the IP from the TCP/IP port
+    const { stdout: ipOut } = await execAsync(
+      `powershell -NoProfile -Command "Get-WmiObject Win32_TCPIPPrinterPort -Filter \\"Name='${portName.replace(/'/g, "''")}'\\\" | Select-Object -ExpandProperty HostAddress"`,
+      { timeout: 6000 }
+    );
+    const ip = ipOut.trim();
+    const valid = /^\d{1,3}(\.\d{1,3}){3}$/.test(ip);
+    console.log(`🖨️ Printer IP lookup: "${printerName}" → port "${portName}" → IP "${ip}" (valid: ${valid})`);
+    return valid ? { success: true, ip } : { success: false };
+  } catch (err: any) {
+    console.warn('⚠️ get-printer-ip failed:', err.message);
+    return { success: false };
+  }
+});
+
+// ── ESC/POS direct TCP printing ───────────────────────────────────────────────
+ipcMain.handle('print-order-escpos', async (_event, orderData: any, printerAddress: string) => {
+  try {
+    const { host, port } = parsePrinterAddress(printerAddress);
+    console.log(`🖨️ ESC/POS print → ${host}:${port}`);
+    const receipt = buildEscPosReceipt(orderData);
+    await sendToTcpPrinter(host, port, receipt);
+    console.log(`✅ ESC/POS sent to ${host}:${port}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('❌ ESC/POS print error:', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('print-order', async (event, orderHtml: string, printerName?: string, paperWidth?: 58 | 80) => {
   let printWindow: BrowserWindow | null = null;
   try {
     console.log('🖨️ Printing order...');
     console.log('Selected printer:', printerName || 'Default');
 
-    // Create a hidden window for printing
+    // Paper width in pixels at 96 DPI so the hidden window renders at actual receipt width
+    // 80mm → 302px, 58mm → 219px  (px = mm * 96 / 25.4)
+    const paperWidthPx = paperWidth === 58 ? 219 : 302;
+
+    // Create a hidden window for printing, sized to the receipt width
     printWindow = new BrowserWindow({
       show: false,
+      width: paperWidthPx,
+      height: 1200,          // tall enough that content never clips before measurement
       webPreferences: {
         nodeIntegration: false,
       },
@@ -434,7 +487,7 @@ ipcMain.handle('print-order', async (event, orderHtml: string, printerName?: str
     // Load the HTML content
     await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(orderHtml)}`);
 
-    // Compute dynamic height (in microns) based on rendered content
+    // Compute dynamic height (in microns) based on rendered content at receipt width
     const contentHeightMicrons = await printWindow.webContents.executeJavaScript(`
       (function () {
         const probe = document.createElement('div');
@@ -452,8 +505,10 @@ ipcMain.handle('print-order', async (event, orderHtml: string, printerName?: str
 
     const pageWidthMicrons = (paperWidth === 58 ? 58000 : 80000);
     const pageHeightMicrons = (typeof contentHeightMicrons === 'number' && contentHeightMicrons > 0)
-      ? Math.max(contentHeightMicrons, 80000)
-      : 600000;
+      ? Math.max(contentHeightMicrons, 50000)   // minimum 50mm
+      : 300000;
+
+    console.log(`🖨️ Paper: ${paperWidth}mm wide | Content height: ${Math.round(pageHeightMicrons / 1000)}mm (${contentHeightMicrons} µm measured)`);
 
     return new Promise((resolve) => {
       printWindow!.webContents.print(

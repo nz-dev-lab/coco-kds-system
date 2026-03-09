@@ -18,6 +18,13 @@ export interface AppConfig {
   tmbill_enabled: boolean;
 }
 
+export interface TmbillMenuItem {
+  item_id: number;
+  item_refid: number;
+  title: string;
+  active: number;
+}
+
 export interface CanonicalItem {
   id: number;
   name: string;
@@ -25,7 +32,7 @@ export interface CanonicalItem {
   station_id: number | null;
   created_at: string;
   cocoeats_maps: { id: number; food_id: string; food_name: string }[];
-  tmbill_maps:   { id: number; item_name: string }[];
+  tmbill_maps:   { id: number; item_id: number; item_name: string }[];
 }
 
 export interface ElectronAPI {
@@ -62,13 +69,15 @@ export interface ElectronAPI {
     deleteCanonical: (id: number) => Promise<{ success: boolean; error?: string }>;
     addCocoeatsMap: (foodId: string, foodName: string, canonicalItemId: number) => Promise<{ success: boolean; error?: string }>;
     removeCocoeatsMap: (foodId: string) => Promise<{ success: boolean; error?: string }>;
-    addTmbillMap: (itemName: string, canonicalItemId: number) => Promise<{ success: boolean; error?: string }>;
-    removeTmbillMap: (itemName: string) => Promise<{ success: boolean; error?: string }>;
+    addTmbillMap: (itemId: number, itemName: string, canonicalItemId: number) => Promise<{ success: boolean; error?: string }>;
+    removeTmbillMap: (itemId: number) => Promise<{ success: boolean; error?: string }>;
   };
   printer: {
     getPrinters: () => Promise<PrinterInfo[]>;
     getDefaultPrinter: () => Promise<PrinterInfo | null>;
     printOrder: (orderHtml: string, printerName?: string, paperWidth?: 58 | 80) => Promise<PrintResult>;
+    printOrderEscpos: (orderData: any, printerAddress: string) => Promise<PrintResult>;
+    getPrinterIp: (printerName: string) => Promise<{ success: boolean; ip?: string }>;
   };
 }
 
@@ -86,6 +95,8 @@ export interface TMBillAPI {
   updateItemStatus: (kotItemId: number, isReady: boolean) => Promise<{ success: boolean }>;
   updateKotStatus: (kotId: number, tableId: number, tableName: string, status: number) => Promise<{ success: boolean }>;
   updateOrderKotStatus: (orderId: string, status: number) => Promise<{ success: boolean }>;
+  fetchMenu: () => Promise<{ success: boolean; count?: number }>;
+  onMenuRefreshed: (callback: (data: { items: TmbillMenuItem[] }) => void) => () => void;
   onServiceFound: (callback: (service: any) => void) => void;
   onServiceLost: (callback: (name: string) => void) => void;
   onOrdersRefreshed: (callback: (data: { running: any[]; settled: any[] }) => void) => () => void;

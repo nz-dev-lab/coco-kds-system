@@ -89,11 +89,6 @@ export const PrintOrderTemplate: React.FC<PrintOrderTemplateProps> = ({ order, r
         </div>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-          <strong>Status:</strong>
-          <span>{order.order_status.toUpperCase()}</span>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
           <strong>Time:</strong>
           <span>{formatDateTime(order.created_at || new Date().toISOString())}</span>
         </div>

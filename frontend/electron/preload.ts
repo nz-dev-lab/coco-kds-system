@@ -76,10 +76,10 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('mapping:add-cocoeats-map', foodId, foodName, canonicalItemId),
     removeCocoeatsMap: (foodId: string) =>
       ipcRenderer.invoke('mapping:remove-cocoeats-map', foodId),
-    addTmbillMap: (itemName: string, canonicalItemId: number) =>
-      ipcRenderer.invoke('mapping:add-tmbill-map', itemName, canonicalItemId),
-    removeTmbillMap: (itemName: string) =>
-      ipcRenderer.invoke('mapping:remove-tmbill-map', itemName),
+    addTmbillMap: (itemId: number, itemName: string, canonicalItemId: number) =>
+      ipcRenderer.invoke('mapping:add-tmbill-map', itemId, itemName, canonicalItemId),
+    removeTmbillMap: (itemId: number) =>
+      ipcRenderer.invoke('mapping:remove-tmbill-map', itemId),
   },
 
   // Printer APIs
@@ -88,6 +88,10 @@ contextBridge.exposeInMainWorld('electron', {
     getDefaultPrinter: () => ipcRenderer.invoke('get-default-printer'),
     printOrder: (orderHtml: string, printerName?: string, paperWidth?: 58 | 80) =>
       ipcRenderer.invoke('print-order', orderHtml, printerName, paperWidth),
+    printOrderEscpos: (orderData: any, printerAddress: string) =>
+      ipcRenderer.invoke('print-order-escpos', orderData, printerAddress),
+    getPrinterIp: (printerName: string) =>
+      ipcRenderer.invoke('get-printer-ip', printerName),
   },
 });
 
@@ -157,6 +161,14 @@ updateOrderKotStatus: (orderId: string, status: number) =>
 
   onLog: (callback: (data: { message: string; type?: string }) => void) => {
     ipcRenderer.on('tmbill:log', (_, data) => callback(data));
+  },
+
+  // Menu — full item list from TMBILL /menu endpoint
+  fetchMenu: () => ipcRenderer.invoke('tmbill:fetch-menu'),
+  onMenuRefreshed: (callback: (data: { items: any[] }) => void) => {
+    const sub = (_: any, data: any) => callback(data);
+    ipcRenderer.on('tmbill:menu-refreshed', sub);
+    return () => ipcRenderer.removeListener('tmbill:menu-refreshed', sub);
   },
 });
 } // end if (TMBILL_ENABLED)

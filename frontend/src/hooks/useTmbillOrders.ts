@@ -7,6 +7,7 @@ import {
   removeTmbillOrder,
   removeTmbillOrderByTableId,
   setTmbillConnected,
+  setTmbillMenu,
 } from '@/store/slices/tmbillOrdersSlice';
 
 const TMBILL_PORT    = 3000;
@@ -246,10 +247,15 @@ export function useTmbillOrders() {
       dispatch(removeTmbillOrderByTableId({ tableId: data.tableId }));
     });
 
+    const unsubMenu = window.tmbill.onMenuRefreshed((data) => {
+      dispatch(setTmbillMenu(data.items));
+    });
+
     return () => {
       unsubRefresh?.();
       unsubRemoved?.();
       unsubSettled?.();
+      unsubMenu?.();
     };
   }, [dispatch]);
 }

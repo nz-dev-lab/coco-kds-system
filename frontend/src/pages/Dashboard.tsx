@@ -79,7 +79,7 @@ function TodaySummary({ restaurantId }: { restaurantId: string }) {
               <div>
                 <p className="text-xs text-slate-400 dark:text-kds-text-muted">Revenue</p>
                 <p className="text-lg font-bold text-green-600">
-                  {stats ? stats.total_revenue.toLocaleString('en-GB', { style: 'currency', currency: 'GBP' }) : '—'}
+                  {stats?.total_revenue != null ? stats.total_revenue.toLocaleString('en-GB', { style: 'currency', currency: 'GBP' }) : '—'}
                 </p>
               </div>
             </div>

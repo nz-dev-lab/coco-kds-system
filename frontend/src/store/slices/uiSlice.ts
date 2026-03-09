@@ -309,14 +309,17 @@ const uiSlice = createSlice({
     // Printer Settings (saves to localStorage)
     // ========================================
     setSelectedPrinterName: (state, action: PayloadAction<string | null>) => {
+      if (!state.settings.printer) state.settings.printer = { selectedPrinterName: null, paperWidth: 80, autoPrint: false };
       state.settings.printer.selectedPrinterName = action.payload;
       saveSettings(state.settings);
     },
     setPaperWidth: (state, action: PayloadAction<58 | 80>) => {
+      if (!state.settings.printer) state.settings.printer = { selectedPrinterName: null, paperWidth: 80, autoPrint: false };
       state.settings.printer.paperWidth = action.payload;
       saveSettings(state.settings);
     },
     toggleAutoPrint: (state) => {
+      if (!state.settings.printer) state.settings.printer = { selectedPrinterName: null, paperWidth: 80, autoPrint: false };
       state.settings.printer.autoPrint = !state.settings.printer.autoPrint;
       saveSettings(state.settings);
     },

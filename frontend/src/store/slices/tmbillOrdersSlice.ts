@@ -8,12 +8,14 @@ import {
   CocoKDSOrder,
   transformTMBillSettledOrder,
 } from '../../../electron/plugins/tmbill/transformer';
+import type { TmbillMenuItem } from '../../../electron/plugins/tmbill/types';
 
 interface TmbillOrdersState {
   runningOrders: CocoKDSOrder[];   // from tables[] — normal KOTs
   settledOrders: CocoKDSOrder[];   // from settledOrders[] — quick bills (pre-transformed)
   bumpedOrders: CocoKDSOrder[];    // bumped (hidden) — retrievable via recall
   connected: boolean;              // true after successful socket connection
+  menu: TmbillMenuItem[];          // full item list from /menu endpoint
 }
 
 const initialState: TmbillOrdersState = {
@@ -21,6 +23,7 @@ const initialState: TmbillOrdersState = {
   settledOrders: [],
   bumpedOrders: [],
   connected: false,
+  menu: [],
 };
 
 const tmbillOrdersSlice = createSlice({
@@ -62,6 +65,11 @@ const tmbillOrdersSlice = createSlice({
     // ── Connection state ──────────────────────────────────────────────────────
     setTmbillConnected: (state, action: PayloadAction<boolean>) => {
       state.connected = action.payload;
+    },
+
+    // ── Menu items from /menu endpoint ────────────────────────────────────────
+    setTmbillMenu: (state, action: PayloadAction<TmbillMenuItem[]>) => {
+      state.menu = action.payload;
     },
 
     // ── Bump — hide order from dashboard, move to bumped list ────────────────
@@ -118,6 +126,7 @@ export const {
   removeTmbillOrder,
   removeTmbillOrderByTableId,
   setTmbillConnected,
+  setTmbillMenu,
   bumpTmbillOrder,
   recallTmbillOrder,
   toggleTmbillItemReady,
@@ -135,5 +144,8 @@ export const selectTmbillSettledOrders = (state: { tmbill: TmbillOrdersState }) 
 
 export const selectTmbillBumpedOrders = (state: { tmbill: TmbillOrdersState }) =>
   state.tmbill.bumpedOrders;
+
+export const selectTmbillMenu = (state: { tmbill: TmbillOrdersState }) =>
+  state.tmbill.menu;
 
 export default tmbillOrdersSlice.reducer;
