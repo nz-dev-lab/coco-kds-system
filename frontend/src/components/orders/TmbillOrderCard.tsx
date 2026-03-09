@@ -3,7 +3,7 @@
 // Excluded: print, delivery modal, scheduled logic, CocoEats-specific fields.
 // Status progression calls window.tmbill IPC instead of CocoEats API.
 
-import { Bike, Check, CookingPot, RectangleEllipsis, ShoppingBag, Store, User, Zap } from 'lucide-react';
+import { Bike, Check, ClipboardList, CookingPot, RectangleEllipsis, ShoppingBag, Store, User, Zap } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { toggleTmbillItemReady, bumpTmbillOrder, recallTmbillOrder } from '../../store/slices/tmbillOrdersSlice';
 import { markOrderAsViewed } from '../../store/slices/ordersSlice';
@@ -28,6 +28,7 @@ export default function TmbillOrderCard({ order, gridPosition, isBumped = false 
   const itemNameUppercase = useAppSelector((s) => s.ui.settings.display.itemNameUppercase ?? false);
 
   const itemNameFontClass: Record<string, string> = { sm: 'text-sm', base: 'text-base', lg: 'text-lg', xl: 'text-xl' };
+  const itemNotesFontClass: Record<string, string> = { sm: 'text-xs', base: 'text-sm', lg: 'text-base', xl: 'text-lg' };
   const itemNameOverflowClass = (itemNameFontSize === 'lg' || itemNameFontSize === 'xl') ? 'line-clamp-2 break-words' : 'truncate';
   const focusedOrderId   = useAppSelector((s) => s.ui.focusedOrderId);
   const recentlyUpdatedIds = useAppSelector((s) => s.ui.recentlyUpdatedOrderIds);
@@ -421,6 +422,14 @@ export default function TmbillOrderCard({ order, gridPosition, isBumped = false 
                 Waiter: {order.ordered_by}
               </div>
             )}
+
+            {/* KOT note / special instructions */}
+            {order.kot_note && (
+              <div className="mx-2 mb-2 px-3 py-2 bg-amber-100 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-600 rounded-lg flex items-start gap-2">
+                <ClipboardList className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+                <span className="text-sm font-medium text-amber-900 dark:text-amber-200 leading-snug">{order.kot_note}</span>
+              </div>
+            )}
           </div>
 
           {/* Progress Bar — identical to OrderCard */}
@@ -462,7 +471,7 @@ export default function TmbillOrderCard({ order, gridPosition, isBumped = false 
                     </span>
                   </div>
                   {item.notes && (
-                    <div className="text-xs text-slate-500 ml-6 truncate">{item.notes}</div>
+                    <div className={`${itemNotesFontClass[itemNameFontSize]} text-slate-500 ml-6 truncate`}>{item.notes}</div>
                   )}
                 </div>
               </div>

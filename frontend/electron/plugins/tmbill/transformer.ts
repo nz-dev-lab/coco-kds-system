@@ -138,6 +138,7 @@ export interface CocoKDSOrder {
   customer_phone: string;
   table_number: string;       // TMBILL-specific, not present in CocoEats orders
   ordered_by?: string;        // waiter/captain name — TMBILL-specific
+  kot_note?: string;          // KOT-level note / special instructions
   items: CocoKDSOrderItem[];
   item_count: number;
   total_amount: string;
@@ -180,6 +181,7 @@ export function transformTMBillRunningTable(table: TMBillRunningTable): CocoKDSO
     customer_phone: '',                              // not available in runningtables response
     table_number: table.table_name || `Table ${table.table_id}`,
     ordered_by: undefined,                           // not in runningtables response
+    kot_note: table.note || undefined,
     items,
     item_count: items.length,
     total_amount: (table.amount ?? 0).toString(),
@@ -315,6 +317,7 @@ export function transformTMBillSettledOrder(order: TMBillSettledOrder): CocoKDSO
     customer_phone: '',
     table_number: '',
     ordered_by: order.user_id,
+    kot_note: order.instructions || undefined,
     items,
     item_count: items.length,
     total_amount: '0',                   // not available in settled order shape
