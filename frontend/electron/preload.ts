@@ -84,6 +84,28 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('mapping:set-station', id, station),
   },
 
+  // KDS mediator server API
+  kdsServer: {
+    // Start the server — only called by the host (stationView === 'all')
+    start: () => ipcRenderer.invoke('kds-server:start'),
+    // Renderer pushes current order state; main process broadcasts to kitchen screens
+    pushOrders: (orders: any[]) =>
+      ipcRenderer.invoke('kds-server:push-orders', orders),
+    // Returns number of currently connected kitchen screens
+    getClientCount: () =>
+      ipcRenderer.invoke('kds-server:get-client-count'),
+    // Returns non-loopback IPv4 addresses of this machine
+    getLocalIps: () => ipcRenderer.invoke('kds-server:get-local-ips'),
+    // Scans local subnet for a KDS server on port 7654; returns IP or null
+    scan: () => ipcRenderer.invoke('kds-server:scan'),
+    // Subscribe to client connect/disconnect events
+    onClientCountChanged: (cb: (count: number) => void) => {
+      const sub = (_event: any, count: number) => cb(count);
+      ipcRenderer.on('kds-server:client-count', sub);
+      return () => ipcRenderer.removeListener('kds-server:client-count', sub);
+    },
+  },
+
   // Printer APIs
   printer: {
     getPrinters: () => ipcRenderer.invoke('get-printers'),

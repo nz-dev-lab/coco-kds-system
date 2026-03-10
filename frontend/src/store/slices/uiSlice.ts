@@ -1,6 +1,8 @@
 // src/store/slices/uiSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
+export type StationView = 'all' | 'main_kitchen' | 'grill';
+
 interface UIState {
   sidebarOpen: boolean;
   navbarOpen: boolean;
@@ -8,6 +10,10 @@ interface UIState {
   selectedSource: 'all' | 'cocoeats' | 'tmbill';
   theme: 'dark' | 'light';
   settings: {
+    stationView: StationView;
+    // IP of the KDS host PC (packing screen). Set on kitchen PCs to receive orders via WebSocket.
+    // Null = standalone mode (fetch from API directly).
+    kdsHostIp: string | null;
     audioNotifications: {
       enabled: boolean;
       voiceEnabled: boolean;
@@ -39,13 +45,15 @@ interface UIState {
 // ============================================
 // ✅ STEP 1: INCREMENT THIS WHEN ADDING NEW SETTINGS
 // ============================================
-// Current version: 4 (added 'printer' field)
-const SETTINGS_VERSION = 4;
+// Current version: 6 (added 'kdsHostIp' field)
+const SETTINGS_VERSION = 6;
 
 // ============================================
 // ✅ STEP 2: ADD NEW FIELDS HERE
 // ============================================
 const getDefaultSettings = (): UIState['settings'] => ({
+  stationView: 'all',
+  kdsHostIp: null,
   audioNotifications: {
     enabled: true,
     voiceEnabled: true,
@@ -113,6 +121,18 @@ const migrateSettings = (oldSettings: any, oldVersion: number): UIState['setting
       paperWidth: 80,
       autoPrint: false,
     };
+  }
+
+  // Migration v4 → v5: Added stationView
+  if (oldVersion < 5) {
+    console.log('📦 Migrating settings v4 → v5: Adding stationView');
+    settings.stationView = 'all';
+  }
+
+  // Migration v5 → v6: Added kdsHostIp
+  if (oldVersion < 6) {
+    console.log('📦 Migrating settings v5 → v6: Adding kdsHostIp');
+    settings.kdsHostIp = null;
   }
 
   return settings as UIState['settings'];
@@ -306,6 +326,22 @@ const uiSlice = createSlice({
     // },
 
     // ========================================
+    // Station View (saves to localStorage)
+    // ========================================
+    setStationView: (state, action: PayloadAction<StationView>) => {
+      state.settings.stationView = action.payload;
+      saveSettings(state.settings);
+    },
+
+    // ========================================
+    // KDS Host IP (saves to localStorage)
+    // ========================================
+    setKdsHostIp: (state, action: PayloadAction<string | null>) => {
+      state.settings.kdsHostIp = action.payload;
+      saveSettings(state.settings);
+    },
+
+    // ========================================
     // Printer Settings (saves to localStorage)
     // ========================================
     setSelectedPrinterName: (state, action: PayloadAction<string | null>) => {
@@ -351,6 +387,7 @@ export const {
   addRecentlyUpdated,
   removeRecentlyUpdated,
   clearRecentlyUpdated,
+  setStationView,
   toggleAudioNotifications,
   toggleVoiceNotifications,
   setSoundEffectsVolume,
@@ -365,6 +402,7 @@ export const {
   setSelectedPrinterName,
   setPaperWidth,
   toggleAutoPrint,
+  setKdsHostIp,
   resetSettings,
 } = uiSlice.actions;
 

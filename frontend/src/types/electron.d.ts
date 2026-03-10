@@ -75,6 +75,14 @@ export interface ElectronAPI {
     removeTmbillMap: (itemId: number) => Promise<{ success: boolean; error?: string }>;
     setStation: (id: number, station: string | null) => Promise<{ success: boolean; error?: string }>;
   };
+  kdsServer: {
+    start: () => Promise<number>;
+    pushOrders: (orders: any[]) => Promise<void>;
+    getClientCount: () => Promise<number>;
+    onClientCountChanged: (cb: (count: number) => void) => () => void;
+    getLocalIps: () => Promise<string[]>;
+    scan: () => Promise<string | null>;
+  };
   printer: {
     getPrinters: () => Promise<PrinterInfo[]>;
     getDefaultPrinter: () => Promise<PrinterInfo | null>;

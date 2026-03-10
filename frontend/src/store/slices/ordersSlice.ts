@@ -14,6 +14,9 @@ interface OrdersState {
   error: string | null;
   lastFetch: number | null;
   newOrderIds: string[];
+  // Persistent item-ready state — survives fetchOrders() replacing the orders array.
+  // Key: orderId, Value: array of itemIds that have been marked ready.
+  readyItemIds: Record<string, string[]>;
 }
 
 const initialState: OrdersState = {
@@ -23,6 +26,7 @@ const initialState: OrdersState = {
   error: null,
   lastFetch: null,
   newOrderIds: [],
+  readyItemIds: {},
 };
 
 // Fetch orders
@@ -142,10 +146,12 @@ const ordersSlice = createSlice({
     },
 
     toggleItemReady: (state, action: PayloadAction<{ orderId: string; itemId: string }>) => {
-      const order = state.orders.find(o => o.id === action.payload.orderId);
-      if (order) {
-        const item = order.items.find(i => i.id === action.payload.itemId);
-        if (item) item.isReady = !item.isReady;
+      const { orderId, itemId } = action.payload;
+      const current = state.readyItemIds[orderId] ?? [];
+      if (current.includes(itemId)) {
+        state.readyItemIds[orderId] = current.filter(id => id !== itemId);
+      } else {
+        state.readyItemIds[orderId] = [...current, itemId];
       }
     },
 
@@ -159,6 +165,7 @@ const ordersSlice = createSlice({
       if (idx !== -1) {
         const [order] = state.orders.splice(idx, 1);
         state.cocoeatsBumpedOrders.unshift(order);
+        delete state.readyItemIds[action.payload.id];
       }
     },
 
@@ -185,6 +192,11 @@ const ordersSlice = createSlice({
         state.orders = action.payload.filter((o: Order) => !bumpedIds.has(o.id));
         state.lastFetch = Date.now();
         // Don't mark fetched orders as new — only WebSocket 'order:new' events should
+        // Prune readyItemIds for orders that no longer exist
+        const activeIds = new Set(state.orders.map((o: Order) => o.id));
+        for (const orderId of Object.keys(state.readyItemIds)) {
+          if (!activeIds.has(orderId)) delete state.readyItemIds[orderId];
+        }
       })
       .addCase(fetchOrders.rejected, (state, action) => {
         state.loading = false;
@@ -316,5 +328,8 @@ export const {
 
 export const selectCocoeatsBumpedOrders = (state: { orders: OrdersState }) =>
   state.orders.cocoeatsBumpedOrders;
+
+export const selectReadyItemIds = (state: { orders: OrdersState }) =>
+  state.orders.readyItemIds;
 
 export default ordersSlice.reducer;

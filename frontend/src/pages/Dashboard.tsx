@@ -6,11 +6,15 @@ import { selectTmbillConnected, selectTmbillBumpedOrders } from '../store/slices
 import { selectAllActiveOrders } from '../store/selectors';
 import OrderCard from '../components/orders/OrderCard';
 import TmbillOrderCard from '../components/orders/TmbillOrderCard';
+import KitchenOrderCard from '../components/orders/KitchenOrderCard';
 import { runTmbillAutoConnect } from '@/hooks/useTmbillOrders';
 import { RefreshCw, Clock, Wifi, WifiOff, ScanSearch, ChevronDown, ChevronUp, ShoppingBag, DollarSign, TrendingUp } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useKdsServerBroadcast } from '@/hooks/useKdsServerBroadcast';
+import { useKdsClient } from '@/hooks/useKdsClient';
+import { useStationFilter } from '@/hooks/useStationFilter';
 import { useLiveClock } from '../hooks/useLiveClock';
-import { clearRecentlyUpdated, releaseFocus } from '@/store/slices/uiSlice';
+import { clearRecentlyUpdated, releaseFocus, type StationView } from '@/store/slices/uiSlice';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { format, parseISO } from 'date-fns';
 
@@ -139,6 +143,7 @@ export default function Dashboard() {
   const selectedSource = useAppSelector((state) => state.ui.selectedSource);
   const focusedOrderId = useAppSelector((state) => state.ui.focusedOrderId);
   const focusedOrderPosition = useAppSelector((state) => state.ui.focusedOrderPosition);
+  const stationView = useAppSelector((state) => state.ui.settings.stationView ?? 'all') as StationView;
   const tmbillConnected = useAppSelector(selectTmbillConnected);
   const hasTmbill = typeof window !== 'undefined' && !!window.tmbill;
 
@@ -153,19 +158,18 @@ export default function Dashboard() {
   // Live clock that updates every second
   const currentTime = useLiveClock();
 
+  const kdsClient = useKdsClient();
+
   useWebSocket();
+  useKdsServerBroadcast();
 
   useEffect(() => {
-    // Initial fetch
+    // Kitchen screens in client mode get orders from the KDS host via WebSocket —
+    // skip fetching from the CocoEats API.
+    if (kdsClient.active) return;
+
     dispatch(fetchOrders());
-
-    // // Refresh every 30 seconds
-    // const interval = setInterval(() => {
-    //   dispatch(fetchOrders());
-    // }, 30000);
-
-    // return () => clearInterval(interval);
-  }, [dispatch]);
+  }, [dispatch, kdsClient.active]);
 
   useEffect(() => {
   return () => {
@@ -231,6 +235,14 @@ export default function Dashboard() {
   return sorted;
 }, [activeOrders, focusedOrderId, focusedOrderPosition]);
 
+  // Station filtering — narrows sortedOrders to items/orders for this screen's station.
+  // When stationView === 'all', returns sortedOrders unchanged.
+  const stationFilteredOrders = useStationFilter(sortedOrders);
+
+  // In client mode, orders arrive pre-filtered from the KDS host server —
+  // no need for local filtering. In standalone/host mode, use local filter.
+  const filteredOrders = kdsClient.active ? kdsClient.orders : stationFilteredOrders;
+
   const handleRefresh = () => {
     dispatch(fetchOrders());
   };
@@ -273,13 +285,28 @@ export default function Dashboard() {
       {/* Header */}
       <div className="bg-white dark:bg-kds-bg-secondary border-b border-slate-200 dark:border-kds-border px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* Left: Title */}
+          {/* Left: Title + Station badge */}
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-kds-text-primary">
-              Active Orders
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-kds-text-primary">
+                Active Orders
+              </h1>
+              {stationView !== 'all' && (() => {
+                const stationMeta: Record<string, { label: string; cls: string }> = {
+                  main_kitchen: { label: 'Main Kitchen', cls: 'bg-orange-100 text-orange-700 border-orange-300' },
+                  grill:        { label: 'Grill & Shawarma', cls: 'bg-red-100 text-red-700 border-red-300' },
+                };
+                const meta = stationMeta[stationView];
+                if (!meta) return null;
+                return (
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${meta.cls}`}>
+                    {meta.label}
+                  </span>
+                );
+              })()}
+            </div>
             <p className="text-sm text-slate-600 dark:text-kds-text-secondary mt-1">
-              {sortedOrders.length} {sortedOrders.length === 1 ? 'order' : 'orders'} in queue
+              {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'} in queue
             </p>
           </div>
 
@@ -291,10 +318,25 @@ export default function Dashboard() {
             </span>
           </div>
 
-          {/* Right: TMBILL status + Refresh */}
+          {/* Right: KDS client status + TMBILL status + Refresh */}
           <div className="flex items-center gap-3">
-            {/* TMBILL POS indicator — only shown when plugin is available */}
-            {hasTmbill && (
+            {/* KDS host connection — shown on kitchen screens in client mode */}
+            {kdsClient.active && (
+              kdsClient.connected ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+                  <Wifi className="w-4 h-4 text-green-500" />
+                  <span className="text-sm font-medium text-green-700 dark:text-green-400">KDS Host</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-600 rounded-lg">
+                  <WifiOff className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <span className="text-sm font-medium text-amber-700 dark:text-amber-400">Connecting…</span>
+                </div>
+              )
+            )}
+
+            {/* TMBILL POS indicator — host only (kitchen client doesn't manage TMBILL) */}
+            {!kdsClient.active && hasTmbill && (
               tmbillConnected ? (
                 <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
                   <Wifi className="w-4 h-4 text-green-500" />
@@ -328,14 +370,16 @@ export default function Dashboard() {
               </button>
             )}
 
-            <button
-              onClick={handleRefresh}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+            {!kdsClient.active && (
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            )}
           </div>
         </div>
 
@@ -375,14 +419,16 @@ export default function Dashboard() {
       {/* Orders Grid */}
       <div className="flex-1 overflow-auto">
         <div className="p-6">
-          {sortedOrders.length === 0 ? (
+          {filteredOrders.length === 0 ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <p className="text-xl text-slate-600 dark:text-kds-text-secondary mb-2">
-                  No active orders
+                  {stationView === 'all' ? 'No active orders' : 'No orders for this station'}
                 </p>
                 <p className="text-sm text-slate-500 dark:text-kds-text-muted">
-                  Orders will appear here when they come in
+                  {stationView === 'all'
+                    ? 'Orders will appear here when they come in'
+                    : 'Orders with items assigned to this station will appear here'}
                 </p>
               </div>
             </div>
@@ -396,10 +442,12 @@ export default function Dashboard() {
                 : 'lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
               }
             `}>
-              {sortedOrders.map((order: any, index) => (
-                order._source === 'tmbill'
-                  ? <TmbillOrderCard key={order.id} order={order} gridPosition={index} />
-                  : <OrderCard key={order.id} order={order} gridPosition={index} />
+              {filteredOrders.map((order: any, index) => (
+                stationView !== 'all'
+                  ? <KitchenOrderCard key={order.id} order={order} />
+                  : order._source === 'tmbill'
+                    ? <TmbillOrderCard key={order.id} order={order} gridPosition={index} />
+                    : <OrderCard key={order.id} order={order} gridPosition={index} />
               ))}
             </div>
           )}

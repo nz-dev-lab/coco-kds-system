@@ -25,6 +25,7 @@ import {
 import { TMBillPlugin } from './plugins/tmbill';
 import { readAppConfig, writeAppConfig } from './appConfig';
 import { buildEscPosReceipt, sendToTcpPrinter, parsePrinterAddress } from './escpos';
+import { startKdsServer, broadcastOrders, getClientCount, stopKdsServer, getLocalIpAddresses, scanForKdsServer } from './kds-server';
 
 
 let mainWindow: BrowserWindow | null = null;
@@ -274,6 +275,37 @@ app.whenReady().then(() => {
   const restaurantId = '2';
   const count = statements.getTotalCount.get(restaurantId);
   console.log(`📊 Total orders for restaurant ${restaurantId}:`, count);
+});
+
+// ── KDS Server IPC handlers ───────────────────────────────────────────────────
+
+// Renderer calls this when stationView === 'all' to start the mediator server.
+// Kitchen PC renderers (stationView !== 'all') never call this, so no server starts.
+ipcMain.handle('kds-server:start', () => {
+  return startKdsServer((clientCount) => {
+    mainWindow?.webContents.send('kds-server:client-count', clientCount);
+  });
+});
+
+// Renderer pushes current order state whenever it changes
+ipcMain.handle('kds-server:push-orders', (_e, orders: any[]) => {
+  broadcastOrders(orders);
+});
+
+// Renderer can query how many kitchen screens are connected
+ipcMain.handle('kds-server:get-client-count', () => {
+  return getClientCount();
+});
+
+// Returns non-loopback IPv4 addresses of this machine (shown in Settings on host screen)
+ipcMain.handle('kds-server:get-local-ips', () => {
+  return getLocalIpAddresses();
+});
+
+// Scans the local subnet for a KDS server on port 7654
+// Used by kitchen screens to auto-discover the host without manual IP entry
+ipcMain.handle('kds-server:scan', async () => {
+  return scanForKdsServer();
 });
 
 // DATABASE IPC HANDLERS
@@ -572,6 +604,7 @@ ipcMain.handle('get-default-printer', async () => {
 app.on('before-quit', () => {
   console.log('🔒 Closing database...');
   closeDatabase();
+  stopKdsServer();
 });
 
 app.on('window-all-closed', () => {
