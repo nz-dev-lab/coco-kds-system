@@ -23,6 +23,7 @@ export interface TmbillMenuItem {
   item_refid: number;
   title: string;
   active: number;
+  price?: number;
 }
 
 export interface CanonicalItem {
@@ -30,6 +31,7 @@ export interface CanonicalItem {
   name: string;
   category: string | null;
   station_id: number | null;
+  station: string | null;
   created_at: string;
   cocoeats_maps: { id: number; food_id: string; food_name: string }[];
   tmbill_maps:   { id: number; item_id: number; item_name: string }[];
@@ -71,6 +73,7 @@ export interface ElectronAPI {
     removeCocoeatsMap: (foodId: string) => Promise<{ success: boolean; error?: string }>;
     addTmbillMap: (itemId: number, itemName: string, canonicalItemId: number) => Promise<{ success: boolean; error?: string }>;
     removeTmbillMap: (itemId: number) => Promise<{ success: boolean; error?: string }>;
+    setStation: (id: number, station: string | null) => Promise<{ success: boolean; error?: string }>;
   };
   printer: {
     getPrinters: () => Promise<PrinterInfo[]>;

@@ -311,6 +311,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tb_map_canonical ON tmbill_item_map(canonical_item_id);
 `);
 
+// ── Migrate: add station TEXT column if not present ──────────────────────────
+try { db.exec(`ALTER TABLE canonical_items ADD COLUMN station TEXT`); } catch { /* already exists */ }
+
 console.log('✅ Item mapping schema ready');
 
 // ── Mapping prepared statements ───────────────────────────────────────────────
@@ -318,7 +321,7 @@ const mappingStatements = {
   // Fetch all canonical items with their CocoEats + TMBILL mappings
   getAllCanonical: db.prepare(`
     SELECT
-      c.id, c.name, c.category, c.station_id, c.created_at,
+      c.id, c.name, c.category, c.station_id, c.station, c.created_at,
       (SELECT json_group_array(json_object('id', m.id, 'food_id', m.food_id, 'food_name', m.food_name))
        FROM cocoeats_item_map m WHERE m.canonical_item_id = c.id) AS cocoeats_maps,
       (SELECT json_group_array(json_object('id', t.id, 'item_id', t.item_id, 'item_name', t.item_name))
@@ -355,6 +358,10 @@ const mappingStatements = {
 
   removeTmbillMap: db.prepare(`
     DELETE FROM tmbill_item_map WHERE item_id = ?
+  `),
+
+  setStation: db.prepare(`
+    UPDATE canonical_items SET station = ? WHERE id = ?
   `),
 
   lookupByFoodId: db.prepare(`
@@ -445,6 +452,15 @@ export function addTmbillMap(itemId: number, itemName: string, canonicalItemId: 
 export function removeTmbillMap(itemId: number) {
   try {
     mappingStatements.removeTmbillMap.run(itemId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function setCanonicalStation(id: number, station: string | null) {
+  try {
+    mappingStatements.setStation.run(station ?? null, id);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };

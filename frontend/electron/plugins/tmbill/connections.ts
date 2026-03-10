@@ -424,6 +424,7 @@ export class TMBillConnection {
             item_refid: i.item_refid ?? 0,
             title:      i.title ?? i.item_name ?? 'Unknown',
             active:     i.active ?? 1,
+            price:      typeof i.sale_price === 'number' ? i.sale_price : undefined,
           }));
         this.log(`✅ Fetched ${items.length} menu items`, 'success');
         return { items };

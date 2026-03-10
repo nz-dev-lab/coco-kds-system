@@ -20,6 +20,7 @@ import {
   removeCocoeatsMap,
   addTmbillMap,
   removeTmbillMap,
+  setCanonicalStation,
 } from './database';
 import { TMBillPlugin } from './plugins/tmbill';
 import { readAppConfig, writeAppConfig } from './appConfig';
@@ -383,6 +384,10 @@ ipcMain.handle('mapping:add-tmbill-map', (_e, itemId: number, itemName: string, 
 
 ipcMain.handle('mapping:remove-tmbill-map', (_e, itemId: number) =>
   removeTmbillMap(itemId)
+);
+
+ipcMain.handle('mapping:set-station', (_e, id: number, station: string | null) =>
+  setCanonicalStation(id, station)
 );
 
 // ⭐ AUTO-UPDATE USER ACTIONS

@@ -18,6 +18,7 @@ export interface TmbillMenuItem {
   item_refid: number;
   title: string;
   active: number;
+  price?: number;
 }
 
 export interface TMBillPluginState {

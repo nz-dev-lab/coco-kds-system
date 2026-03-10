@@ -80,6 +80,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('mapping:add-tmbill-map', itemId, itemName, canonicalItemId),
     removeTmbillMap: (itemId: number) =>
       ipcRenderer.invoke('mapping:remove-tmbill-map', itemId),
+    setStation: (id: number, station: string | null) =>
+      ipcRenderer.invoke('mapping:set-station', id, station),
   },
 
   // Printer APIs
