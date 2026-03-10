@@ -1,7 +1,7 @@
 {
   "name": "kds-frontend",
-  "version": "1.1.7",
-  "description": "Kitchen Display System - Electron + React",
+  "version": "1.1.8",
+  "description": "CocoFlow - Restaurant Operations Platform",
   "main": "dist-electron/main.js",
   "author": "Nz-Dev-Lab",
   "license": "MIT",
@@ -60,7 +60,7 @@
   },
   "build": {
     "appId": "com.kds.kitchen-display-system",
-    "productName": "Coco.KDS",
+    "productName": "CocoFlow",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -91,7 +91,7 @@
       "target": [
         "dmg"
       ],
-      "artifactName": "Coco.KDS-${version}.${ext}",
+      "artifactName": "CocoFlow-${version}.${ext}",
       "category": "public.app-category.business"
     },
     "win": {
@@ -103,14 +103,13 @@
           ]
         }
       ],
-      "artifactName": "Coco.KDS.Setup.${version}.${ext}",
-      "icon": "build/icon.png"
+      "artifactName": "CocoFlow.Setup.${version}.${ext}"
     },
     "linux": {
       "target": [
         "AppImage"
       ],
-      "artifactName": "Coco.KDS-${version}.${ext}",
+      "artifactName": "CocoFlow-${version}.${ext}",
       "category": "Office"
     },
     "deb": {

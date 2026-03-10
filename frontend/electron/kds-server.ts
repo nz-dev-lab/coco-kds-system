@@ -193,12 +193,23 @@ export function stopKdsServer() {
 
 // ── Network utilities ─────────────────────────────────────────────────────────
 
-/** Returns all non-loopback IPv4 addresses of this machine. */
+/** Returns true for RFC 1918 private LAN addresses (excludes Tailscale, VPNs, etc.) */
+function isPrivateLanIp(ip: string): boolean {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4) return false;
+  return (
+    parts[0] === 10 ||
+    (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
+    (parts[0] === 192 && parts[1] === 168)
+  );
+}
+
+/** Returns non-loopback RFC 1918 IPv4 addresses of this machine (LAN only). */
 export function getLocalIpAddresses(): string[] {
   const ips: string[] = [];
   for (const iface of Object.values(os.networkInterfaces())) {
     for (const alias of iface ?? []) {
-      if (alias.family === 'IPv4' && !alias.internal) {
+      if (alias.family === 'IPv4' && !alias.internal && isPrivateLanIp(alias.address)) {
         ips.push(alias.address);
       }
     }

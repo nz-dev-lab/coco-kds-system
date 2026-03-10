@@ -67,6 +67,7 @@ function createWindow() {
     minHeight: 720,
     frame: false,
     titleBarStyle: 'hidden',
+    icon: path.join(__dirname, '..', 'build', 'icon.png'),
     fullscreen: !isDev,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -78,7 +79,7 @@ function createWindow() {
     },
     autoHideMenuBar: true,
     backgroundColor: '#0f172a',
-    title: 'Kitchen Display System',
+    title: 'CocoFlow',
   });
 
   // Enhanced error logging with correct event signatures

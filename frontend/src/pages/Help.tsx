@@ -108,7 +108,7 @@ export default function Help() {
       <div>
         <h1 className="text-3xl font-bold text-slate-900 dark:text-kds-text-primary">Help &amp; Guide</h1>
         <p className="text-slate-500 dark:text-kds-text-secondary mt-1">
-          Learn how to use Coco KDS — icons, statuses, and features explained.
+          Learn how to use CocoFlow — icons, statuses, and features explained.
         </p>
       </div>
 
@@ -281,7 +281,7 @@ export default function Help() {
 
       <Section title="TMBILL POS Connection">
         <p className="text-sm text-slate-500 dark:text-kds-text-secondary mb-5">
-          Coco KDS integrates with the TMBILL POS system over your local network. Orders placed on the
+          CocoFlow integrates with the TMBILL POS system over your local network. Orders placed on the
           POS terminal appear in real time on the dashboard alongside CocoEats orders.
         </p>
 

@@ -424,7 +424,7 @@ export default function Settings() {
             <div className="px-4 py-3 rounded-lg bg-blue-50 border border-blue-200">
               <p className="text-xs font-medium text-blue-700 mb-1">How to connect a kitchen screen</p>
               <p className="text-xs text-blue-600 leading-relaxed">
-                On each kitchen screen, open the CocoEats KDS app, go to Settings, set the station (Main Kitchen / Grill),
+                On each kitchen screen, open CocoFlow, go to Settings, set the station (Main Kitchen / Grill),
                 then tap <strong>Auto-detect KDS Host</strong> — or enter this computer's IP manually.
               </p>
             </div>
