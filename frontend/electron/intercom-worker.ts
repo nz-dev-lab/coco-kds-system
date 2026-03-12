@@ -26,13 +26,10 @@ client.on('call-started',  () => console.log('[intercom] call started'))
 client.on('call-ended',    () => console.log('[intercom] call ended'))
 client.on('error', (err: any) => console.error('[intercom] error:', err.message))
 
-// Accept / reject commands sent from the main process via stdin
-process.stdin.on('data', (data: Buffer) => {
-  try {
-    const { type } = JSON.parse(data.toString().trim())
-    if (type === 'accept') client.acceptCall()
-    if (type === 'reject') client.rejectCall()
-  } catch { /* ignore malformed */ }
+// Accept / reject commands sent from the main process via utilityProcess IPC
+;(process as any).parentPort?.on('message', (e: { data: { type: string } }) => {
+  if (e.data.type === 'accept') client.acceptCall()
+  if (e.data.type === 'reject') client.rejectCall()
 })
 
 client.start()

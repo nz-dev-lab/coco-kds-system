@@ -1,5 +1,6 @@
 // components/TopBar.tsx
 import { Menu, ChevronDown, ChevronUp, Bell, User, LogOut } from 'lucide-react';
+import iconUrl from '../assets/icon.png';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { toggleSidebar, toggleNavbar, setSelectedSource } from '../store/slices/uiSlice';
 import { logout } from '../store/slices/authSlice';
@@ -45,7 +46,7 @@ export default function TopBar() {
               <Menu className="w-5 h-5 text-slate-700 dark:text-kds-text-primary" />
             </button>
             <div className="flex items-center gap-2.5">
-              <img src="/icon.png" alt="CocoFlow" className="w-8 h-8 rounded-lg flex-shrink-0" />
+              <img src={iconUrl} alt="CocoFlow" className="w-8 h-8 rounded-lg flex-shrink-0" />
               <div className="flex items-baseline gap-2">
                 <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-500 to-teal-500 dark:from-cyan-400 dark:to-teal-400 bg-clip-text text-transparent leading-none">
                   CocoFlow

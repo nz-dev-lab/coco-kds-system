@@ -1,5 +1,6 @@
 // src/pages/Login.tsx
 import { useState, useEffect } from 'react';
+import iconUrl from '../assets/icon.png';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { login } from '../store/slices/authSlice';
@@ -48,7 +49,7 @@ export default function Login() {
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-5">
               <img
-                src="/icon.png"
+                src={iconUrl}
                 alt="CocoFlow"
                 className="w-24 h-24 rounded-3xl shadow-2xl shadow-teal-500/20 dark:shadow-teal-500/30"
               />

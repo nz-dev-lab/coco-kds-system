@@ -1,5 +1,5 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
-import { exec, spawn, ChildProcess } from 'child_process';
+import { app, BrowserWindow, ipcMain, utilityProcess } from 'electron';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 const execAsync = promisify(exec);
 import { autoUpdater } from 'electron-updater';
@@ -31,15 +31,15 @@ import { startKdsServer, broadcastOrders, getClientCount, stopKdsServer, getLoca
 let mainWindow: BrowserWindow | null = null;
 const isDev = process.env.NODE_ENV === 'development';
 let tmbillPlugin: TMBillPlugin | null = null;
-let intercomWorker: ChildProcess | null = null;
+// utilityProcess runs inside Electron's bundled Node.js — no system Node required.
+// It does NOT load Chromium's WebRTC, so @roamhq/wrtc can start safely.
+let intercomWorker: ReturnType<typeof utilityProcess.fork> | null = null;
 let intercomReady = false;
 
 function startIntercomWorker(): void {
-  // Uses plain node (NOT Electron binary) to avoid the wrtc + Electron
-  // native WebRTC conflict that causes SIGABRT.
   const workerPath = path.join(__dirname, 'intercom-worker.js');
-  const worker = spawn('node', [workerPath], {
-    stdio: ['pipe', 'pipe', 'pipe'],
+  const worker = utilityProcess.fork(workerPath, [], {
+    stdio: 'pipe',
     cwd: path.join(app.getAppPath(), '..'), // ensures node_modules is resolvable
     env: { ...process.env, TALECOM_AUTO_ACCEPT: process.env.TALECOM_AUTO_ACCEPT },
   });
@@ -53,7 +53,7 @@ function startIntercomWorker(): void {
   });
   worker.stderr?.on('data', (d: Buffer) =>
     console.error('[intercom]', d.toString().trimEnd()));
-  worker.on('exit', (code) => {
+  worker.on('exit', (code: number) => {
     console.log(`🎙️ Intercom worker exited (code ${code})`);
     intercomWorker = null;
     intercomReady = false;
@@ -436,11 +436,11 @@ ipcMain.handle('intercom:get-status', () => ({
 }));
 
 ipcMain.handle('intercom:accept-call', () => {
-  intercomWorker?.stdin?.write(JSON.stringify({ type: 'accept' }) + '\n');
+  intercomWorker?.postMessage({ type: 'accept' });
 });
 
 ipcMain.handle('intercom:reject-call', () => {
-  intercomWorker?.stdin?.write(JSON.stringify({ type: 'reject' }) + '\n');
+  intercomWorker?.postMessage({ type: 'reject' });
 });
 
 // CONFIG IPC HANDLERS

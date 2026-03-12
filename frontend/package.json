@@ -1,6 +1,6 @@
 {
   "name": "kds-frontend",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "CocoFlow - Restaurant Operations Platform",
   "main": "dist-electron/main.js",
   "author": "Nz-Dev-Lab",
