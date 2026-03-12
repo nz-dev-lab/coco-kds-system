@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import type { AppDispatch } from '@/store';
 import {
   setTmbillOrders,
@@ -203,10 +203,15 @@ export async function runTmbillAutoConnect(dispatch: AppDispatch): Promise<void>
 
 export function useTmbillOrders() {
   const dispatch = useAppDispatch();
+  const stationView = useAppSelector((s) => s.ui.settings.stationView ?? 'all');
 
   // ── Connection + scan + retry ──────────────────────────────────────────
   useEffect(() => {
     if (!window.tmbill) return;
+    // Kitchen screens are pure KDS clients — they get orders from the host via
+    // WebSocket, not from TMBILL directly. Skip auto-connect to avoid spurious
+    // "Reconnecting to TMBILL POS" toasts on kitchen screens.
+    if (stationView !== 'all') return;
 
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let stopped = false;
@@ -229,11 +234,12 @@ export function useTmbillOrders() {
       stopped = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [dispatch]);
+  }, [dispatch, stationView]);
 
   // ── Real-time event listeners ──────────────────────────────────────────
   useEffect(() => {
     if (!window.tmbill) return;
+    if (stationView !== 'all') return;
 
     const unsubRefresh = window.tmbill.onOrdersRefreshed((data) => {
       dispatch(setTmbillOrders({ running: data.running, settled: data.settled }));
@@ -257,5 +263,5 @@ export function useTmbillOrders() {
       unsubSettled?.();
       unsubMenu?.();
     };
-  }, [dispatch]);
+  }, [dispatch, stationView]);
 }

@@ -4,7 +4,7 @@ import CocoEatsIcon from '../icons/CocoEatsIcon';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { toggleItemReady, updateOrderStatus, bumpCocoeatsOrder, recallCocoeatsOrder } from '../../store/slices/ordersSlice';
 import DeliveryDetailsModal from './DeliveryDetailsModal';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { getScheduledInfo, formatCountdown } from '../../utils/scheduledOrderUtils';
 import { audioNotificationService } from '@/utils/audioNotifications';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
@@ -66,7 +66,7 @@ interface OrderCardProps {
   isBumped?: boolean;
 }
 
-export default function OrderCard({ order, gridPosition, isBumped = false }: OrderCardProps) {
+function OrderCard({ order, gridPosition, isBumped = false }: OrderCardProps) {
   const dispatch = useAppDispatch();
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -944,3 +944,4 @@ return (
   </>
 );
 }
+export default memo(OrderCard);

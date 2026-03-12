@@ -1,6 +1,6 @@
 // src/pages/Settings.tsx
 import { useState, useEffect, useCallback } from 'react';
-import { Volume2, Mic, MicOff, Play, RotateCcw, Type, CaseSensitive, Printer, RefreshCw, Zap, Monitor, Wifi, WifiOff, ScanSearch } from 'lucide-react';
+import { Volume2, Mic, MicOff, Play, RotateCcw, Type, CaseSensitive, Printer, RefreshCw, Zap, Monitor, Wifi, WifiOff, ScanSearch, Bug } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   toggleAudioNotifications,
@@ -17,6 +17,7 @@ import {
   toggleAutoPrint,
   setStationView,
   setKdsHostIp,
+  setDebugMode,
   type StationView,
 } from '../store/slices/uiSlice';
 import { audioNotificationService } from '../utils/audioNotifications';
@@ -896,6 +897,39 @@ export default function Settings() {
               </button>
             </div>
           </>
+        )}
+      </div>
+
+      {/* Developer Settings Section */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold text-slate-800 mb-1 flex items-center gap-2">
+          <Bug className="w-5 h-5" />
+          Developer
+        </h2>
+        <p className="text-sm text-slate-500 mb-4">
+          Debug tools for troubleshooting in production. Enabling this shows KDS and TMBILL debug panels in Utilities.
+          Disable in normal operation — logging adds no overhead when off.
+        </p>
+        <div className="flex items-center justify-between py-3 border-b">
+          <div>
+            <p className="font-medium text-slate-800">Debug Mode</p>
+            <p className="text-sm text-slate-500">Enables KDS log capture and shows debug panels under Utilities</p>
+          </div>
+          <button
+            onClick={() => dispatch(setDebugMode(!(settings.debugMode ?? false)))}
+            className={`relative w-14 h-7 rounded-full transition-colors ${
+              settings.debugMode ? 'bg-amber-500' : 'bg-slate-300'
+            }`}
+          >
+            <span className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
+              settings.debugMode ? 'translate-x-7' : 'translate-x-0'
+            }`} />
+          </button>
+        </div>
+        {settings.debugMode && (
+          <p className="mt-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Debug mode is on — KDS log capture is active. Go to Utilities to view debug panels. Disable when not needed.
+          </p>
         )}
       </div>
 

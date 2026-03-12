@@ -15,6 +15,26 @@ import { useKdsClient } from '@/hooks/useKdsClient';
 import { useStationFilter } from '@/hooks/useStationFilter';
 import { useLiveClock } from '../hooks/useLiveClock';
 import { clearRecentlyUpdated, releaseFocus, type StationView } from '@/store/slices/uiSlice';
+
+// Isolated clock component — updates every second without re-rendering Dashboard
+function LiveClockDisplay() {
+  const currentTime = useLiveClock();
+  return (
+    <span className="text-2xl font-mono font-bold text-slate-900 dark:text-kds-text-primary tracking-wider">
+      {currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+    </span>
+  );
+}
+
+// Moved outside component — constant, never changes, no need to recreate on every render
+const STATUS_PRIORITY: Record<string, number> = {
+  pending: 1,
+  confirmed: 2,
+  processing: 3,
+  ready: 4,
+  handover: 5,
+  delivered: 6,
+};
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { format, parseISO } from 'date-fns';
 
@@ -155,9 +175,6 @@ export default function Dashboard() {
   const [tmbillScanning, setTmbillScanning] = useState(false);
   const [showBumped, setShowBumped] = useState(false);
 
-  // Live clock that updates every second
-  const currentTime = useLiveClock();
-
   const kdsClient = useKdsClient();
 
   useWebSocket();
@@ -180,7 +197,7 @@ export default function Dashboard() {
 }, [dispatch]);
 
   // Filter out completed/delivered orders + apply source filter
-  const activeOrders = orders.filter((order) => {
+  const activeOrders = useMemo(() => orders.filter((order) => {
     // Source filter
     if (selectedSource === 'cocoeats' && order._source !== 'cocoeats') return false;
     if (selectedSource === 'tmbill' && order._source !== 'tmbill') return false;
@@ -193,55 +210,49 @@ export default function Dashboard() {
     if (order._source === 'tmbill' && order.status === 'handover') return false;
 
     return true;
-  });
+  }), [orders, selectedSource]);
 
-  // Sort orders by status priority first, then by creation time (newest first)
-  const statusPriority: Record<string, number> = {
-    pending: 1,
-    confirmed: 2,
-    processing: 3,
-    ready: 4,
-    handover: 5,
-    delivered: 6,
-  };
+  const sortedOrders = useMemo(() => {
+    // 1. Sort all orders by priority first
+    const sorted = [...activeOrders].sort((a, b) => {
+      // TMBILL orders use `status`; CocoEats orders use `order_status`
+      const statusA = a._source === 'tmbill' ? a.status : a.order_status;
+      const statusB = b._source === 'tmbill' ? b.status : b.order_status;
+      const statusDiff = (STATUS_PRIORITY[statusA] || 99) - (STATUS_PRIORITY[statusB] || 99);
+      if (statusDiff !== 0) return statusDiff;
+      const timeA = new Date(a.created_at ?? 0).getTime();
+      const timeB = new Date(b.created_at ?? 0).getTime();
+      return timeB - timeA; // newest first within same status (freshest order at front)
+    });
 
- const sortedOrders = useMemo(() => {
-  // 1. Sort all orders by priority first
-  const sorted = [...activeOrders].sort((a, b) => {
-    // TMBILL orders use `status`; CocoEats orders use `order_status`
-    const statusA = a._source === 'tmbill' ? a.status : a.order_status;
-    const statusB = b._source === 'tmbill' ? b.status : b.order_status;
-    const statusDiff = (statusPriority[statusA] || 99) - (statusPriority[statusB] || 99);
-    if (statusDiff !== 0) return statusDiff;
-    const timeA = new Date(a.created_at ?? 0).getTime();
-    const timeB = new Date(b.created_at ?? 0).getTime();
-    return timeB - timeA; // newest first within same status (freshest order at front)
-  });
-  
-  // 2. If there's a focused order, keep it at its original position
-  if (focusedOrderId && focusedOrderPosition !== null) {
-    const focusedIndex = sorted.findIndex(o => o.id === focusedOrderId);
-    
-    if (focusedIndex > -1) {
-      // Remove focused order from its sorted position
-      const [focusedOrder] = sorted.splice(focusedIndex, 1);
-      
-      // Insert at original position (or as close as possible)
-      const insertPosition = Math.min(focusedOrderPosition, sorted.length);
-      sorted.splice(insertPosition, 0, focusedOrder);
+    // 2. If there's a focused order, keep it at its original position
+    if (focusedOrderId && focusedOrderPosition !== null) {
+      const focusedIndex = sorted.findIndex(o => o.id === focusedOrderId);
+
+      if (focusedIndex > -1) {
+        const [focusedOrder] = sorted.splice(focusedIndex, 1);
+        const insertPosition = Math.min(focusedOrderPosition, sorted.length);
+        sorted.splice(insertPosition, 0, focusedOrder);
+      }
     }
-  }
-  
-  return sorted;
-}, [activeOrders, focusedOrderId, focusedOrderPosition]);
+
+    return sorted;
+  }, [activeOrders, focusedOrderId, focusedOrderPosition]);
 
   // Station filtering — narrows sortedOrders to items/orders for this screen's station.
   // When stationView === 'all', returns sortedOrders unchanged.
   const stationFilteredOrders = useStationFilter(sortedOrders);
 
-  // In client mode, orders arrive pre-filtered from the KDS host server —
-  // no need for local filtering. In standalone/host mode, use local filter.
-  const filteredOrders = kdsClient.active ? kdsClient.orders : stationFilteredOrders;
+  // In client mode, orders arrive pre-filtered from the KDS host server.
+  // Apply the same status filter as a safety net — prevents stale handover orders
+  // from appearing if the server sent them before cachedOrders was fully refreshed.
+  const filteredOrders = kdsClient.active
+    ? kdsClient.orders.filter((order: any) => {
+        if (order._source === 'tmbill' && order.status === 'handover') return false;
+        if (order.order_status === 'delivered' || order.order_status === 'picked_up') return false;
+        return true;
+      })
+    : stationFilteredOrders;
 
   const handleRefresh = () => {
     dispatch(fetchOrders());
@@ -257,15 +268,6 @@ export default function Dashboard() {
     }
   };
 
-  // Format time function
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-  };
 
   if (loading && orders.length === 0) {
     return (
@@ -310,12 +312,10 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* Center: Live Clock */}
+          {/* Center: Live Clock — isolated component so only it re-renders every second */}
           <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-kds-surface rounded-lg border border-slate-200 dark:border-kds-border">
             <Clock className="w-5 h-5 text-slate-600 dark:text-kds-text-secondary" />
-            <span className="text-2xl font-mono font-bold text-slate-900 dark:text-kds-text-primary tracking-wider">
-              {formatTime(currentTime)}
-            </span>
+            <LiveClockDisplay />
           </div>
 
           {/* Right: KDS client status + TMBILL status + Refresh */}

@@ -5,9 +5,9 @@
 
 import { Bike, Check, ClipboardList, CookingPot, RectangleEllipsis, ShoppingBag, Store, User, Zap } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { toggleTmbillItemReady, bumpTmbillOrder, recallTmbillOrder } from '../../store/slices/tmbillOrdersSlice';
+import { toggleTmbillItemReady, bumpTmbillOrder, recallTmbillOrder, markAllTmbillItemsReady } from '../../store/slices/tmbillOrdersSlice';
 import { markOrderAsViewed } from '../../store/slices/ordersSlice';
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { CocoKDSOrder } from '../../../electron/plugins/tmbill/transformer';
 import { setFocusedOrder, addRecentlyUpdated, releaseFocus, removeRecentlyUpdated } from '../../store/slices/uiSlice';
@@ -18,7 +18,7 @@ interface TmbillOrderCardProps {
   isBumped?: boolean;
 }
 
-export default function TmbillOrderCard({ order, gridPosition, isBumped = false }: TmbillOrderCardProps) {
+function TmbillOrderCard({ order, gridPosition, isBumped = false }: TmbillOrderCardProps) {
   const dispatch = useAppDispatch();
   const currentTime = useCurrentTime();
 
@@ -170,6 +170,9 @@ export default function TmbillOrderCard({ order, gridPosition, isBumped = false 
           setTimeout(() => dispatch(releaseFocus()), 15000);
           break;
         case 'processing':
+          // Mark all items ready before the API call so setTmbillOrders preservation
+          // keeps them checked across the subsequent kds-kot-updated refresh.
+          dispatch(markAllTmbillItemsReady({ orderId: order.id }));
           await window.tmbill.updateOrderKotStatus(order._tmbill_order_id, 5);
           dispatch(addRecentlyUpdated(order.id));
           setTimeout(() => dispatch(releaseFocus()), 15000);
@@ -190,6 +193,9 @@ export default function TmbillOrderCard({ order, gridPosition, isBumped = false 
           setTimeout(() => dispatch(releaseFocus()), 15000);
           break;
         case 'processing':
+          // Mark all items ready before the API call so setTmbillOrders preservation
+          // keeps them checked across the subsequent kds-kot-updated refresh.
+          dispatch(markAllTmbillItemsReady({ orderId: order.id }));
           await window.tmbill.updateKotStatus(order._tmbill_kot_id, order._tmbill_table_id, order._tmbill_table_name, 4);
           dispatch(addRecentlyUpdated(order.id));
           setTimeout(() => dispatch(releaseFocus()), 15000);
@@ -614,3 +620,5 @@ export default function TmbillOrderCard({ order, gridPosition, isBumped = false 
     </>
   );
 }
+
+export default memo(TmbillOrderCard);

@@ -1,19 +1,20 @@
 // src/App.tsx
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'; 
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAppSelector } from './store/hooks';
 import MainLayout from './components/Layout/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Dispatch from './pages/Dispatch';
-import { ToastContainer } from 'react-toastify'; 
+import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import UpdateManager from './components/UpdateManager';
 import Foods from './pages/Foods';
 import Notifications from './pages/Notifications';
 import Help from './pages/Help';
-import TMBillDebugPanel from './features/tmbill/components/TmbillDebugPanel';
 import { useTmbillOrders } from './hooks/useTmbillOrders';
+import { setKdsDebugEnabled } from './utils/kdsLogger';
 
 import History from './pages/History';
 import Orders from './pages/Orders';
@@ -32,7 +33,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const debugMode = useAppSelector((s) => s.ui.settings.debugMode ?? false);
   useTmbillOrders(); // Hook to manage TMBILL orders and keep Redux store in sync
+
+  // Sync debug mode into the kdsLogger module — enables/disables log capture globally
+  useEffect(() => {
+    setKdsDebugEnabled(debugMode);
+  }, [debugMode]);
 
   return (
     <>
@@ -64,7 +71,6 @@ function App() {
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/utilities" element={<Utilities />} />
                     <Route path="/help" element={<Help />} />
-                    <Route path="/tmbill-debug" element={<TMBillDebugPanel />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>
                 </MainLayout>

@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAppSelector } from '../store/hooks';
+import { kdsLog } from '../utils/kdsLogger';
 
 const KDS_PORT = 7654;
 const RECONNECT_DELAY_MS = 3000;
@@ -54,20 +55,29 @@ export function useKdsClient(): KdsClientState {
         if (!mountedRef.current) { ws.close(); return; }
         setConnected(true);
         ws.send(JSON.stringify({ type: 'register', stationView }));
-        console.log(`[KDS Client] Connected to ws://${kdsHostIp}:${KDS_PORT} as ${stationView}`);
+        const msg = `[KDS Client] Connected to ws://${kdsHostIp}:${KDS_PORT} as ${stationView}`;
+        console.log(msg);
+        kdsLog(msg, 'client');
       };
 
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data as string);
-          if (msg.type === 'orders_update') setOrders(msg.orders ?? []);
+          if (msg.type === 'orders_update') {
+            const logMsg = `[KDS Client] orders_update: ${(msg.orders ?? []).length} orders`;
+            console.log(logMsg);
+            kdsLog(logMsg, 'client');
+            setOrders(msg.orders ?? []);
+          }
         } catch { /* ignore malformed */ }
       };
 
       ws.onclose = () => {
         setConnected(false);
         if (mountedRef.current) {
-          console.log(`[KDS Client] Disconnected — reconnecting in ${RECONNECT_DELAY_MS}ms`);
+          const msg = `[KDS Client] Disconnected — reconnecting in ${RECONNECT_DELAY_MS}ms`;
+          console.log(msg);
+          kdsLog(msg, 'client', 'warn');
           reconnectRef.current = setTimeout(connect, RECONNECT_DELAY_MS);
         }
       };

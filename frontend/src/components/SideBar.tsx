@@ -50,12 +50,6 @@ const navigationItems: NavItem[] = [
     path: '/history',
   },
   {
-    id: 'tmbill-debug',
-    label: 'TMBill Debug',
-    icon: History,
-    path: '/tmbill-debug',
-  },
-  {
     id: 'utilities',
     label: 'Utilities',
     icon: Wrench,
@@ -118,9 +112,7 @@ useEffect(() => {
           </div>
 
           <nav className="flex-1 space-y-2">
-            {navigationItems.filter(item =>
-              item.id !== 'tmbill-debug' || !!window.tmbill
-            ).map((item) => {
+            {navigationItems.map((item) => {
               const Icon = item.icon;
               return (
                 <NavLink

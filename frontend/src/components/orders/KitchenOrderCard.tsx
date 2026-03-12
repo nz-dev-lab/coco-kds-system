@@ -16,7 +16,7 @@
 //   - Special notes (KOT note / order note)
 //   - Item list — large, high-contrast, quantity-first
 
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import {
   AlertCircle,
   Bike,
@@ -52,7 +52,7 @@ const ITEM_FONT: Record<string, string> = {
   xl:   'text-2xl',
 };
 
-export default function KitchenOrderCard({ order }: KitchenOrderCardProps) {
+function KitchenOrderCard({ order }: KitchenOrderCardProps) {
   const dispatch = useAppDispatch();
   const currentTime = useCurrentTime();
 
@@ -225,3 +225,5 @@ export default function KitchenOrderCard({ order }: KitchenOrderCardProps) {
     </div>
   );
 }
+
+export default memo(KitchenOrderCard);

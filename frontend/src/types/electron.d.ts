@@ -80,6 +80,7 @@ export interface ElectronAPI {
     pushOrders: (orders: any[]) => Promise<void>;
     getClientCount: () => Promise<number>;
     onClientCountChanged: (cb: (count: number) => void) => () => void;
+    onLog: (cb: (msg: string) => void) => () => void;
     getLocalIps: () => Promise<string[]>;
     scan: () => Promise<string | null>;
   };

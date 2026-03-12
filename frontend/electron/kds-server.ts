@@ -22,8 +22,15 @@ let wss: WebSocketServer | null = null;
 const clients = new Set<KdsClient>();
 let cachedOrders: any[] = [];
 let clientChangedCb: ((count: number) => void) | null = null;
+let logCb: ((msg: string) => void) | null = null;
+
+function kdsServerLog(msg: string) {
+  console.log(msg);
+  logCb?.(msg);
+}
 
 // ── Station filtering helpers ─────────────────────────────────────────────────
+
 
 function parseStations(station: string | null | undefined): string[] {
   if (!station) return [];
@@ -71,6 +78,14 @@ function filterOrdersForStation(orders: any[], stationView: StationView): any[] 
   for (const order of orders) {
     const isTmbill = order._source === 'tmbill';
 
+    // Skip orders that are already completed/served — mirrors Dashboard.tsx activeOrders filter.
+    if (!isTmbill) {
+      const s = order.order_status;
+      if (s === 'delivered' || s === 'picked_up') continue;
+    } else {
+      if (order.status === 'handover') continue;
+    }
+
     const filteredItems = (order.items ?? []).filter((item: any) => {
       // Running KOT orders: food_id = menu item_id as string → ID lookup works.
       // Settled/QB orders:  food_id = order child row id    → ID lookup fails,
@@ -84,11 +99,16 @@ function filterOrdersForStation(orders: any[], stationView: StationView): any[] 
       return stations.includes(stationView);
     });
 
-    // Keep ready items for strikethrough display; only drop the order when all done.
+    // No items assigned to this station — skip.
+    if (filteredItems.length === 0) continue;
+
+    // Drop the order from this station once all its assigned items are marked ready.
+    // isReady is preserved across TMBILL refreshes in setTmbillOrders (Redux), so
+    // this correctly reflects what the user has checked — no server-side race fix needed.
     const allDone = filteredItems.every((item: any) => item.isReady);
-    if (!allDone) {
-      filtered.push({ ...order, items: filteredItems });
-    }
+    if (allDone) continue;
+
+    filtered.push({ ...order, items: filteredItems });
   }
 
   return filtered;
@@ -108,10 +128,14 @@ function notifyClientCount() {
 
 // ── Server lifecycle ──────────────────────────────────────────────────────────
 
-export function startKdsServer(onClientChanged?: (count: number) => void): number {
+export function startKdsServer(
+  onClientChanged?: (count: number) => void,
+  onLog?: (msg: string) => void,
+): number {
   if (wss) return KDS_SERVER_PORT;
 
   if (onClientChanged) clientChangedCb = onClientChanged;
+  if (onLog) logCb = onLog;
 
   wss = new WebSocketServer({ port: KDS_SERVER_PORT });
 
@@ -121,7 +145,7 @@ export function startKdsServer(onClientChanged?: (count: number) => void): numbe
     notifyClientCount();
 
     send(client, { type: 'connected', port: KDS_SERVER_PORT });
-    console.log(`[KDS Server] Client connected (${clients.size} total)`);
+    kdsServerLog(`[KDS Server] Client connected (${clients.size} total)`);
 
     ws.on('message', (data) => {
       try {
@@ -138,7 +162,7 @@ export function startKdsServer(onClientChanged?: (count: number) => void): numbe
           const filtered = filterOrdersForStation(cachedOrders, client.stationView);
           send(client, { type: 'orders_update', orders: filtered });
 
-          console.log(`[KDS Server] Client registered as: ${client.stationView}`);
+          kdsServerLog(`[KDS Server] Client registered as: ${client.stationView}, sent ${filtered.length} orders`);
 
         } else if (msg.type === 'ping') {
           send(client, { type: 'pong' });
@@ -151,7 +175,7 @@ export function startKdsServer(onClientChanged?: (count: number) => void): numbe
     ws.on('close', () => {
       clients.delete(client);
       notifyClientCount();
-      console.log(`[KDS Server] Client disconnected (${clients.size} total)`);
+      kdsServerLog(`[KDS Server] Client disconnected (${clients.size} total)`);
     });
 
     ws.on('error', () => {
@@ -161,10 +185,10 @@ export function startKdsServer(onClientChanged?: (count: number) => void): numbe
   });
 
   wss.on('error', (err: Error) => {
-    console.error('[KDS Server] Server error:', err.message);
+    kdsServerLog(`[KDS Server] Server error: ${err.message}`);
   });
 
-  console.log(`[KDS Server] Listening on ws://0.0.0.0:${KDS_SERVER_PORT}`);
+  kdsServerLog(`[KDS Server] Listening on ws://0.0.0.0:${KDS_SERVER_PORT}`);
   return KDS_SERVER_PORT;
 }
 

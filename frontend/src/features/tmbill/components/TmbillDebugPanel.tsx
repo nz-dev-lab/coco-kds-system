@@ -88,8 +88,14 @@ export default function TMBillDebugPanel() {
       });
     }
 
-    // const interval = setInterval(loadData, 5000);
-    // return () => clearInterval(interval);
+    // Keep live order count up to date
+    const unsubOrders = window.tmbill.onOrdersRefreshed(({ running }) => {
+      setOrders(running);
+    });
+
+    return () => {
+      unsubOrders?.();
+    };
   }, []);
 
   const loadData = async () => {
@@ -99,8 +105,11 @@ export default function TMBillDebugPanel() {
         window.tmbill.getConfig(),
         window.tmbill.getState(),
       ]);
-      
-      setServices(servicesData);
+
+      // Only overwrite the services list when the plugin actually found something.
+      // After a manual connect + login, getServices() may return [] (mDNS only),
+      // which would hide the "Connect Socket" UI. Preserve manually-added entries.
+      if (servicesData.length > 0) setServices(servicesData);
       setConfig(configData);
       setState(stateData);
       setIsAuthenticated(stateData.authenticated);
@@ -358,7 +367,7 @@ export default function TMBillDebugPanel() {
 
   if (!window.tmbill) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white p-6 flex items-center justify-center">
+      <div className="h-full overflow-y-auto bg-gray-900 text-white p-6 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-4 text-red-500">❌ TMBILL Plugin Not Available</h1>
           <p className="text-gray-400 mb-4">The TMBILL plugin is not enabled or loaded.</p>
@@ -369,7 +378,7 @@ export default function TMBillDebugPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
+    <div className="h-full overflow-y-auto bg-gray-900 text-white p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Header */}
@@ -736,11 +745,11 @@ export default function TMBillDebugPanel() {
                   <p className="text-gray-400 text-xs mt-1">Orders Received</p>
                 </div>
                 <div className="bg-blue-900/30 rounded p-3 text-center">
-                  <p className="text-2xl font-bold text-blue-400">{services[0]?.host}</p>
+                  <p className="text-2xl font-bold text-blue-400">{state?.service?.host ?? services[0]?.host ?? '—'}</p>
                   <p className="text-gray-400 text-xs mt-1">POS Server</p>
                 </div>
                 <div className="bg-purple-900/30 rounded p-3 text-center">
-                  <p className="text-2xl font-bold text-purple-400">{username}</p>
+                  <p className="text-2xl font-bold text-purple-400">{username || '—'}</p>
                   <p className="text-gray-400 text-xs mt-1">Connected As</p>
                 </div>
               </div>

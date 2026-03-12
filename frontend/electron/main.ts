@@ -283,9 +283,10 @@ app.whenReady().then(() => {
 // Renderer calls this when stationView === 'all' to start the mediator server.
 // Kitchen PC renderers (stationView !== 'all') never call this, so no server starts.
 ipcMain.handle('kds-server:start', () => {
-  return startKdsServer((clientCount) => {
-    mainWindow?.webContents.send('kds-server:client-count', clientCount);
-  });
+  return startKdsServer(
+    (clientCount) => { mainWindow?.webContents.send('kds-server:client-count', clientCount); },
+    (msg) => { mainWindow?.webContents.send('kds-server:log', msg); },
+  );
 });
 
 // Renderer pushes current order state whenever it changes

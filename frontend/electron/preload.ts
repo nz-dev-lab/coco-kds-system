@@ -104,6 +104,12 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('kds-server:client-count', sub);
       return () => ipcRenderer.removeListener('kds-server:client-count', sub);
     },
+    // Subscribe to log messages from the main-process KDS server
+    onLog: (cb: (msg: string) => void) => {
+      const sub = (_event: any, msg: string) => cb(msg);
+      ipcRenderer.on('kds-server:log', sub);
+      return () => ipcRenderer.removeListener('kds-server:log', sub);
+    },
   },
 
   // Printer APIs

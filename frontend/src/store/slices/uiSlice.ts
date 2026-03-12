@@ -36,6 +36,7 @@ interface UIState {
       paperWidth: 58 | 80;
       autoPrint: boolean;
     };
+    debugMode: boolean;
   };
   focusedOrderId: string | null;
   focusedOrderPosition: number | null;
@@ -45,8 +46,8 @@ interface UIState {
 // ============================================
 // ✅ STEP 1: INCREMENT THIS WHEN ADDING NEW SETTINGS
 // ============================================
-// Current version: 6 (added 'kdsHostIp' field)
-const SETTINGS_VERSION = 6;
+// Current version: 7 (added 'debugMode' field)
+const SETTINGS_VERSION = 7;
 
 // ============================================
 // ✅ STEP 2: ADD NEW FIELDS HERE
@@ -76,6 +77,7 @@ const getDefaultSettings = (): UIState['settings'] => ({
     paperWidth: 80,
     autoPrint: false,
   },
+  debugMode: false,
 });
 
 // ============================================
@@ -133,6 +135,12 @@ const migrateSettings = (oldSettings: any, oldVersion: number): UIState['setting
   if (oldVersion < 6) {
     console.log('📦 Migrating settings v5 → v6: Adding kdsHostIp');
     settings.kdsHostIp = null;
+  }
+
+  // Migration v6 → v7: Added debugMode
+  if (oldVersion < 7) {
+    console.log('📦 Migrating settings v6 → v7: Adding debugMode');
+    settings.debugMode = false;
   }
 
   return settings as UIState['settings'];
@@ -361,6 +369,14 @@ const uiSlice = createSlice({
     },
 
     // ========================================
+    // Debug Mode (saves to localStorage)
+    // ========================================
+    setDebugMode: (state, action: PayloadAction<boolean>) => {
+      state.settings.debugMode = action.payload;
+      saveSettings(state.settings);
+    },
+
+    // ========================================
     // Reset Settings (saves to localStorage)
     // ========================================
     resetSettings: (state) => {
@@ -403,6 +419,7 @@ export const {
   setPaperWidth,
   toggleAutoPrint,
   setKdsHostIp,
+  setDebugMode,
   resetSettings,
 } = uiSlice.actions;
 
