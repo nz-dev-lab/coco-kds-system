@@ -10,6 +10,7 @@ import Dispatch from './pages/Dispatch';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import UpdateManager from './components/UpdateManager';
+import IncomingCallBar from './components/IncomingCallBar';
 import Foods from './pages/Foods';
 import Notifications from './pages/Notifications';
 import Help from './pages/Help';
@@ -44,6 +45,7 @@ function App() {
   return (
     <>
     <UpdateManager />
+    {window.electron?.talecomEnabled && <IncomingCallBar />}
       <HashRouter>
         <Routes>
           {/* Public Route: Login */}

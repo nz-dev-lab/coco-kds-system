@@ -19,6 +19,9 @@
     "preview": "vite preview"
   },
   "keywords": [],
+  "optionalDependencies": {
+    "tailcom-client": "github:nz-dev-lab/tailcom-client#main"
+  },
   "dependencies": {
     "@reduxjs/toolkit": "^2.9.0",
     "@tailwindcss/container-queries": "^0.1.1",

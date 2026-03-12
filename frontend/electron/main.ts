@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
-import { exec } from 'child_process';
+import { exec, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 const execAsync = promisify(exec);
 import { autoUpdater } from 'electron-updater';
@@ -31,6 +31,44 @@ import { startKdsServer, broadcastOrders, getClientCount, stopKdsServer, getLoca
 let mainWindow: BrowserWindow | null = null;
 const isDev = process.env.NODE_ENV === 'development';
 let tmbillPlugin: TMBillPlugin | null = null;
+let intercomWorker: ChildProcess | null = null;
+let intercomReady = false;
+
+function startIntercomWorker(): void {
+  // Uses plain node (NOT Electron binary) to avoid the wrtc + Electron
+  // native WebRTC conflict that causes SIGABRT.
+  const workerPath = path.join(__dirname, 'intercom-worker.js');
+  const worker = spawn('node', [workerPath], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    cwd: path.join(app.getAppPath(), '..'), // ensures node_modules is resolvable
+    env: { ...process.env, TALECOM_AUTO_ACCEPT: process.env.TALECOM_AUTO_ACCEPT },
+  });
+  worker.stdout?.on('data', (d: Buffer) => {
+    const msg = d.toString().trimEnd();
+    console.log('[intercom]', msg);
+    if (msg.includes('listening on port')) intercomReady = true;
+    if (msg.includes('incoming-call')) mainWindow?.webContents.send('intercom:incoming-call');
+    if (msg.includes('call started'))  mainWindow?.webContents.send('intercom:call-started');
+    if (msg.includes('call ended'))    mainWindow?.webContents.send('intercom:call-ended');
+  });
+  worker.stderr?.on('data', (d: Buffer) =>
+    console.error('[intercom]', d.toString().trimEnd()));
+  worker.on('exit', (code) => {
+    console.log(`🎙️ Intercom worker exited (code ${code})`);
+    intercomWorker = null;
+    intercomReady = false;
+  });
+  intercomWorker = worker;
+  console.log('🎙️ Talecom intercom worker started');
+}
+
+function stopIntercomWorker(): void {
+  if (intercomWorker) {
+    intercomWorker.kill();
+    intercomWorker = null;
+    intercomReady = false;
+  }
+}
 
 // Configure auto-updater (only in production)
 if (!isDev) {
@@ -58,7 +96,9 @@ function createWindow() {
   // Read config BEFORE creating the window so the preload inherits the env var
   const appConfig = readAppConfig();
   process.env.TMBILL_ENABLED = appConfig.tmbill_enabled ? 'true' : 'false';
-  console.log('🔧 App config loaded — TMBILL:', appConfig.tmbill_enabled ? 'ENABLED' : 'DISABLED');
+  process.env.TALECOM_ENABLED = appConfig.talecom_enabled ? 'true' : 'false';
+  process.env.TALECOM_AUTO_ACCEPT = appConfig.talecom_auto_accept ? 'true' : 'false';
+  console.log('🔧 App config loaded — TMBILL:', appConfig.tmbill_enabled ? 'ENABLED' : 'DISABLED', '| TALECOM:', appConfig.talecom_enabled ? 'ENABLED' : 'DISABLED', '| AUTO_ACCEPT:', appConfig.talecom_auto_accept ? 'YES' : 'NO');
 
   mainWindow = new BrowserWindow({
     width: 1920,
@@ -266,6 +306,13 @@ app.whenReady().then(() => {
   createWindow();
   setupMaximizeListeners();
 
+  // Start intercom worker only when talecom is enabled in config
+  if (process.env.TALECOM_ENABLED === 'true') {
+    startIntercomWorker();
+  } else {
+    console.log('🎙️ Talecom disabled — intercom worker not started');
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -380,13 +427,36 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
 
+// INTERCOM IPC HANDLERS
+ipcMain.handle('intercom:get-status', () => ({
+  enabled: process.env.TALECOM_ENABLED === 'true',
+  running: intercomWorker !== null,
+  ready: intercomReady,
+  port: 7655,
+}));
+
+ipcMain.handle('intercom:accept-call', () => {
+  intercomWorker?.stdin?.write(JSON.stringify({ type: 'accept' }) + '\n');
+});
+
+ipcMain.handle('intercom:reject-call', () => {
+  intercomWorker?.stdin?.write(JSON.stringify({ type: 'reject' }) + '\n');
+});
+
 // CONFIG IPC HANDLERS
 ipcMain.handle('config:get', () => {
   return readAppConfig();
 });
 
-ipcMain.handle('config:set', (_event, patch: { tmbill_enabled?: boolean }) => {
-  return writeAppConfig(patch);
+ipcMain.handle('config:set', (_event, patch: Partial<{ tmbill_enabled: boolean; talecom_enabled: boolean; talecom_auto_accept: boolean }>) => {
+  const updated = writeAppConfig(patch);
+  // Restart the intercom worker immediately if auto-accept setting changed
+  if ('talecom_auto_accept' in patch && process.env.TALECOM_ENABLED === 'true') {
+    process.env.TALECOM_AUTO_ACCEPT = updated.talecom_auto_accept ? 'true' : 'false';
+    stopIntercomWorker();
+    startIntercomWorker();
+  }
+  return updated;
 });
 
 // ITEM MAPPING IPC HANDLERS
@@ -607,6 +677,7 @@ app.on('before-quit', () => {
   console.log('🔒 Closing database...');
   closeDatabase();
   stopKdsServer();
+  stopIntercomWorker();
 });
 
 app.on('window-all-closed', () => {

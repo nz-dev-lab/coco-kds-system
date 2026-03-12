@@ -16,6 +16,8 @@ export interface PrintResult {
 
 export interface AppConfig {
   tmbill_enabled: boolean;
+  talecom_enabled: boolean;
+  talecom_auto_accept: boolean;
 }
 
 export interface TmbillMenuItem {
@@ -45,6 +47,18 @@ export interface ElectronAPI {
   isMaximized: () => Promise<boolean>;
   getAppVersion: () => Promise<string>;
   platform: string;
+  talecomEnabled: boolean;
+  intercom: {
+    getStatus:       () => Promise<{ enabled: boolean; running: boolean; ready: boolean; port: number }>;
+    acceptCall:      () => Promise<void>;
+    rejectCall:      () => Promise<void>;
+    onIncomingCall:  (cb: () => void) => void;
+    onCallStarted:   (cb: () => void) => void;
+    onCallEnded:     (cb: () => void) => void;
+    offIncomingCall: (cb: () => void) => void;
+    offCallStarted:  (cb: () => void) => void;
+    offCallEnded:    (cb: () => void) => void;
+  };
   config: {
     get: () => Promise<AppConfig>;
     set: (patch: Partial<AppConfig>) => Promise<AppConfig>;

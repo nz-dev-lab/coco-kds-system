@@ -25,6 +25,20 @@ contextBridge.exposeInMainWorld('electron', {
 
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   platform: process.platform,
+  talecomEnabled: process.env.TALECOM_ENABLED === 'true',
+
+  // Intercom (Talecom) status + call control
+  intercom: {
+    getStatus:     () => ipcRenderer.invoke('intercom:get-status'),
+    acceptCall:    () => ipcRenderer.invoke('intercom:accept-call'),
+    rejectCall:    () => ipcRenderer.invoke('intercom:reject-call'),
+    onIncomingCall: (cb: () => void) => { ipcRenderer.on('intercom:incoming-call', cb); },
+    onCallStarted:  (cb: () => void) => { ipcRenderer.on('intercom:call-started', cb); },
+    onCallEnded:    (cb: () => void) => { ipcRenderer.on('intercom:call-ended', cb); },
+    offIncomingCall: (cb: () => void) => { ipcRenderer.removeListener('intercom:incoming-call', cb); },
+    offCallStarted:  (cb: () => void) => { ipcRenderer.removeListener('intercom:call-started', cb); },
+    offCallEnded:    (cb: () => void) => { ipcRenderer.removeListener('intercom:call-ended', cb); },
+  },
 
   // Auto-updater
   autoUpdater: {
@@ -60,7 +74,7 @@ contextBridge.exposeInMainWorld('electron', {
   // App config
   config: {
     get: () => ipcRenderer.invoke('config:get'),
-    set: (patch: { tmbill_enabled?: boolean }) => ipcRenderer.invoke('config:set', patch),
+    set: (patch: { tmbill_enabled?: boolean; talecom_enabled?: boolean; talecom_auto_accept?: boolean }) => ipcRenderer.invoke('config:set', patch),
   },
 
   // Item mapping API

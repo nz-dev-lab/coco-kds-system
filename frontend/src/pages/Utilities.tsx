@@ -2,13 +2,14 @@
 // Shell page for utility tools. Add new tools as tabs here.
 
 import { useState } from 'react';
-import { Wrench, Link2, Terminal, Bug, ChevronRight } from 'lucide-react';
+import { Wrench, Link2, Terminal, Bug, Phone, ChevronRight } from 'lucide-react';
 import { useAppSelector } from '../store/hooks';
 import ItemMapping from './utilities/ItemMapping';
 import KdsDebugPanel from './utilities/KdsDebugPanel';
 import TMBillDebugPanel from '../features/tmbill/components/TmbillDebugPanel';
+import TalecomPanel from './utilities/TalecomPanel';
 
-type Tab = 'item-mapping' | 'kds-debug' | 'tmbill-debug';
+type Tab = 'item-mapping' | 'kds-debug' | 'tmbill-debug' | 'talecom';
 
 interface TabDef {
   id: Tab;
@@ -39,6 +40,13 @@ const ALL_TABS: TabDef[] = [
     icon: Bug,
     visible: () => !!window.tmbill,
   },
+  {
+    id: 'talecom',
+    label: 'Talecom',
+    description: 'Intercom voice call status and settings — monitor the worker and configure call behaviour',
+    icon: Phone,
+    visible: () => !!window.electron?.talecomEnabled,
+  },
 ];
 
 export default function Utilities() {
@@ -48,6 +56,7 @@ export default function Utilities() {
   // Tabs visible in current mode
   const tabs = ALL_TABS.filter(t => {
     if (t.id === 'item-mapping') return true;
+    if (t.id === 'talecom') return t.visible ? t.visible() : false;
     if (!debugMode) return false;
     return t.visible ? t.visible() : true;
   });
@@ -99,6 +108,7 @@ export default function Utilities() {
         {resolvedTab === 'item-mapping' && <ItemMapping />}
         {resolvedTab === 'kds-debug'    && <KdsDebugPanel />}
         {resolvedTab === 'tmbill-debug' && <TMBillDebugPanel />}
+        {resolvedTab === 'talecom'      && <TalecomPanel />}
       </div>
     </div>
   );

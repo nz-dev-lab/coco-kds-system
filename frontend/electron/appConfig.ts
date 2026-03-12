@@ -13,11 +13,14 @@ import fs from 'fs';
 
 export interface AppConfig {
   tmbill_enabled: boolean;
+  talecom_enabled: boolean;
+  talecom_auto_accept: boolean;
 }
 
-// Defaults — change tmbill_enabled to false when shipping to non-TMBILL customers
 const DEFAULTS: AppConfig = {
   tmbill_enabled: true,
+  talecom_enabled: true,
+  talecom_auto_accept: true,
 };
 
 const CONFIG_PATH = path.join(app.getPath('userData'), 'config.json');
