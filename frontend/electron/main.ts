@@ -57,7 +57,13 @@ function startIntercomWorker(): void {
   const worker = spawn(process.execPath, [unpackedWorkerPath], {
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     cwd: path.join(app.getAppPath(), '..'),
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', TAILCOM_AUTO_ACCEPT: process.env.TAILCOM_AUTO_ACCEPT },
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      // Point NODE_PATH to asar node_modules so worker can resolve tailcom-client etc.
+      NODE_PATH: path.join(app.getAppPath(), 'node_modules'),
+      TAILCOM_AUTO_ACCEPT: process.env.TAILCOM_AUTO_ACCEPT,
+    },
   });
   worker.stdout?.on('data', (d: Buffer) => {
     const lines = d.toString().trimEnd().split('\n');
