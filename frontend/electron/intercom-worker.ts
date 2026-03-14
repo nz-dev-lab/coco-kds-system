@@ -10,8 +10,10 @@ import { execSync } from 'child_process';
 let TailcomClient: any;
 try {
   ({ TailcomClient } = require('tailcom-client'));
-} catch {
-  console.error('[intercom] tailcom-client package not installed — exiting');
+} catch (err: any) {
+  console.error('[intercom] tailcom-client not found:', err.message);
+  console.error('[intercom] NODE_PATH:', process.env.NODE_PATH);
+  console.error('[intercom] module paths:', module.paths.join(' | '));
   process.exit(1);
 }
 
