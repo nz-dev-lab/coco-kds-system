@@ -1,6 +1,6 @@
 {
   "name": "kds-frontend",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "CocoFlow - Restaurant Operations Platform",
   "main": "dist-electron/main.js",
   "author": "Nz-Dev-Lab",
@@ -13,6 +13,7 @@
     "dev": "npm run build:electron && concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "cross-env VITE_APP_VERSION=$npm_package_version vite",
     "dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
+    "dev:second": "cross-env NODE_ENV=development electron . --user-data-dir=/tmp/cocoflow-kitchen",
     "build": "cross-env NODE_ENV=production VITE_APP_VERSION=$npm_package_version tsc && vite build && npm run build:electron",
     "build:electron": "cross-env NODE_ENV=production tsc -p electron/tsconfig.json",
     "electron:build": "npm run build && cross-env NODE_ENV=production electron-builder --publish never",

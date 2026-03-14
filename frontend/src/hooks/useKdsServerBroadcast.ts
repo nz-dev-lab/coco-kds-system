@@ -16,9 +16,18 @@ export function useKdsServerBroadcast() {
   const stationView = useAppSelector((s) => s.ui.settings.stationView ?? 'all');
   const allOrders = useAppSelector(selectAllActiveOrders);
 
-  // Keep a ref so the client-connect listener always has the latest filtered orders
-  // without stale closure issues.
-  const latestFilteredRef = useRef<any[]>([]);
+  // Compute activeForBroadcast during render (synchronously) so latestFilteredRef
+  // is always current — even before effects run. This prevents the stale-ref blink
+  // where onClientCountChanged fires and reads a value that's one render behind.
+  const activeForBroadcast = stationView === 'all'
+    ? allOrders.filter((o: any) => {
+        if (o._source === 'tmbill') return o.status !== 'handover';
+        return o.order_status !== 'delivered' && o.order_status !== 'picked_up';
+      })
+    : [];
+
+  const latestFilteredRef = useRef<any[]>(activeForBroadcast);
+  latestFilteredRef.current = activeForBroadcast; // always in sync with current render
 
   // Start the KDS server on mount — only when this screen is the host.
   useEffect(() => {
@@ -28,15 +37,13 @@ export function useKdsServerBroadcast() {
     window.electron.kdsServer.start().catch(() => {});
   }, [stationView]);
 
-  // When a new kitchen client connects, immediately re-push the latest filtered orders
-  // so they don't get a stale cachedOrders snapshot from the server.
+  // When a new kitchen client connects, immediately push the latest filtered orders.
+  // latestFilteredRef is updated synchronously during render so this is always fresh.
   useEffect(() => {
     if (stationView !== 'all') return;
     if (!window.electron?.kdsServer) return;
     const unsub = window.electron.kdsServer.onClientCountChanged((_count: number) => {
-      if (latestFilteredRef.current.length >= 0) {
-        window.electron!.kdsServer!.pushOrders(latestFilteredRef.current);
-      }
+      window.electron!.kdsServer!.pushOrders(latestFilteredRef.current);
     });
     return unsub;
   }, [stationView]);
@@ -45,14 +52,6 @@ export function useKdsServerBroadcast() {
   useEffect(() => {
     if (stationView !== 'all') return;
     if (!window.electron?.kdsServer) return;
-    // Strip completed/served orders before broadcasting — kitchen screens must not
-    // display orders the ALL screen has already hidden. selectAllActiveOrders includes
-    // TMBILL settledOrders (for the host's recall view) but those must not reach stations.
-    const activeForBroadcast = allOrders.filter((o: any) => {
-      if (o._source === 'tmbill') return o.status !== 'handover';
-      return o.order_status !== 'delivered' && o.order_status !== 'picked_up';
-    });
-    latestFilteredRef.current = activeForBroadcast;
     const msg = `[KDS Broadcast] ${allOrders.length} → ${activeForBroadcast.length} after filter`;
     console.log(msg);
     kdsLog(msg, 'host');

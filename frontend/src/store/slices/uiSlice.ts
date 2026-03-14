@@ -20,6 +20,11 @@ interface UIState {
       soundEffectsVolume: number; // 0-100
       voiceVolume: number; // 0-100
     };
+    tmbillNotifications: {
+      enabled: boolean;
+      customSoundPath: string | null; // absolute path to user-chosen audio file; null = default beep
+      volume: number; // 0-100
+    };
     display: {
       showOrderAge: boolean;
       autoRefresh: boolean;
@@ -46,8 +51,8 @@ interface UIState {
 // ============================================
 // ✅ STEP 1: INCREMENT THIS WHEN ADDING NEW SETTINGS
 // ============================================
-// Current version: 7 (added 'debugMode' field)
-const SETTINGS_VERSION = 7;
+// Current version: 8 (added 'tmbillNotifications' block)
+const SETTINGS_VERSION = 8;
 
 // ============================================
 // ✅ STEP 2: ADD NEW FIELDS HERE
@@ -71,6 +76,11 @@ const getDefaultSettings = (): UIState['settings'] => ({
   interaction: {
     processingMode: 'buttons',
     requireDoubleTap: true,
+  },
+  tmbillNotifications: {
+    enabled: true,
+    customSoundPath: null,
+    volume: 80,
   },
   printer: {
     selectedPrinterName: null,
@@ -141,6 +151,16 @@ const migrateSettings = (oldSettings: any, oldVersion: number): UIState['setting
   if (oldVersion < 7) {
     console.log('📦 Migrating settings v6 → v7: Adding debugMode');
     settings.debugMode = false;
+  }
+
+  // Migration v7 → v8: Added tmbillNotifications
+  if (oldVersion < 8) {
+    console.log('📦 Migrating settings v7 → v8: Adding tmbillNotifications');
+    settings.tmbillNotifications = {
+      enabled: true,
+      customSoundPath: null,
+      volume: 80,
+    };
   }
 
   return settings as UIState['settings'];
@@ -369,6 +389,22 @@ const uiSlice = createSlice({
     },
 
     // ========================================
+    // TMBILL Notification Settings (saves to localStorage)
+    // ========================================
+    toggleTmbillNotifications: (state) => {
+      state.settings.tmbillNotifications.enabled = !state.settings.tmbillNotifications.enabled;
+      saveSettings(state.settings);
+    },
+    setTmbillNotificationVolume: (state, action: PayloadAction<number>) => {
+      state.settings.tmbillNotifications.volume = action.payload;
+      saveSettings(state.settings);
+    },
+    setTmbillCustomSoundPath: (state, action: PayloadAction<string | null>) => {
+      state.settings.tmbillNotifications.customSoundPath = action.payload;
+      saveSettings(state.settings);
+    },
+
+    // ========================================
     // Debug Mode (saves to localStorage)
     // ========================================
     setDebugMode: (state, action: PayloadAction<boolean>) => {
@@ -420,6 +456,9 @@ export const {
   toggleAutoPrint,
   setKdsHostIp,
   setDebugMode,
+  toggleTmbillNotifications,
+  setTmbillNotificationVolume,
+  setTmbillCustomSoundPath,
   resetSettings,
 } = uiSlice.actions;
 

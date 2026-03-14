@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, utilityProcess } from 'electron';
+import { app, BrowserWindow, ipcMain, utilityProcess, dialog } from 'electron';
+import fs from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 const execAsync = promisify(exec);
@@ -192,7 +193,10 @@ function createWindow() {
     mainWindow = null;
   });
   mainWindow.webContents.on('did-finish-load', () => {
-    if (appConfig.tmbill_enabled) {
+    // Guard: did-finish-load fires on every hot reload in dev.
+    // IPC handlers must only be registered once per process — re-calling
+    // initialize() would throw "second handler for tmbill:*".
+    if (appConfig.tmbill_enabled && !tmbillPlugin) {
       tmbillPlugin = new TMBillPlugin({
         enabled: true,
         serviceType: '_http._tcp',
@@ -301,6 +305,12 @@ function setupAutoUpdater(window: BrowserWindow) {
     });
   });
 }
+
+// Allow audio to play without prior user interaction.
+// Chromium 73+ silently mutes HTMLAudioElement.play() when the window hasn't
+// had a user gesture — play() resolves but no sound comes out. This is wrong
+// for a KDS app where notifications fire autonomously.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 app.whenReady().then(() => {
   createWindow();
@@ -457,6 +467,29 @@ ipcMain.handle('config:set', (_event, patch: Partial<{ tmbill_enabled: boolean; 
     startIntercomWorker();
   }
   return updated;
+});
+
+// FILE PICKER IPC HANDLER
+ipcMain.handle('dialog:pick-audio-file', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Select Notification Sound',
+    filters: [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'm4a'] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
+});
+
+// TMBILL — read audio file bytes for custom notification sound.
+// Renderer fetch('file://...') is silently suppressed by Chromium; reading via
+// the main process with fs and sending the buffer is the only reliable approach.
+ipcMain.handle('tmbill:read-audio-file', async (_event, filePath: string) => {
+  try {
+    return await fs.promises.readFile(filePath);
+  } catch (err) {
+    console.error('[TMBILL] Failed to read audio file:', err);
+    return null;
+  }
 });
 
 // ITEM MAPPING IPC HANDLERS

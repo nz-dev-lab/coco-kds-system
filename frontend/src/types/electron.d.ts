@@ -98,6 +98,7 @@ export interface ElectronAPI {
     getLocalIps: () => Promise<string[]>;
     scan: () => Promise<string | null>;
   };
+  pickAudioFile: () => Promise<string | null>;
   printer: {
     getPrinters: () => Promise<PrinterInfo[]>;
     getDefaultPrinter: () => Promise<PrinterInfo | null>;
@@ -121,6 +122,7 @@ export interface TMBillAPI {
   updateItemStatus: (kotItemId: number, isReady: boolean) => Promise<{ success: boolean }>;
   updateKotStatus: (kotId: number, tableId: number, tableName: string, status: number) => Promise<{ success: boolean }>;
   updateOrderKotStatus: (orderId: string, status: number) => Promise<{ success: boolean }>;
+  readAudioFile: (filePath: string) => Promise<ArrayBuffer | null>;
   fetchMenu: () => Promise<{ success: boolean; count?: number }>;
   onMenuRefreshed: (callback: (data: { items: TmbillMenuItem[] }) => void) => () => void;
   onServiceFound: (callback: (service: any) => void) => void;

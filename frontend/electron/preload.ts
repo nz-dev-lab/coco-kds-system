@@ -126,6 +126,9 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
 
+  // File picker
+  pickAudioFile: () => ipcRenderer.invoke('dialog:pick-audio-file'),
+
   // Printer APIs
   printer: {
     getPrinters: () => ipcRenderer.invoke('get-printers'),
@@ -206,6 +209,11 @@ updateOrderKotStatus: (orderId: string, status: number) =>
   onLog: (callback: (data: { message: string; type?: string }) => void) => {
     ipcRenderer.on('tmbill:log', (_, data) => callback(data));
   },
+
+  // Custom notification sound — read file bytes via main process.
+  // Renderer fetch('file://...') is silently suppressed by Chromium;
+  // this is the only reliable way to load a user-picked audio file.
+  readAudioFile: (filePath: string) => ipcRenderer.invoke('tmbill:read-audio-file', filePath),
 
   // Menu — full item list from TMBILL /menu endpoint
   fetchMenu: () => ipcRenderer.invoke('tmbill:fetch-menu'),

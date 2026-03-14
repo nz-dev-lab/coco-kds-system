@@ -18,6 +18,9 @@ import {
   setStationView,
   setKdsHostIp,
   setDebugMode,
+  toggleTmbillNotifications,
+  setTmbillNotificationVolume,
+  setTmbillCustomSoundPath,
   type StationView,
 } from '../store/slices/uiSlice';
 import { audioNotificationService } from '../utils/audioNotifications';
@@ -573,6 +576,111 @@ export default function Settings() {
   </div>
 </div>
       </div>
+
+      {/* TMBILL Notifications Section — only shown when TMBILL is enabled */}
+      {window.tmbill && (
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold text-slate-800 mb-1 flex items-center gap-2">
+            <Volume2 className="w-5 h-5" />
+            TMBILL Order Notifications
+          </h2>
+          <p className="text-sm text-slate-500 mb-4">Audio alert when a new TMBILL POS order arrives</p>
+
+          {/* Enable toggle */}
+          <div className="flex items-center justify-between py-3 border-b">
+            <div>
+              <p className="font-medium text-slate-800">Enable TMBILL Notifications</p>
+              <p className="text-sm text-slate-500">Play a sound when a new TMBILL order comes in</p>
+            </div>
+            <button
+              onClick={() => dispatch(toggleTmbillNotifications())}
+              className={`relative w-14 h-7 rounded-full transition-colors ${
+                settings.tmbillNotifications?.enabled ? 'bg-green-500' : 'bg-slate-300'
+              }`}
+            >
+              <span
+                className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
+                  settings.tmbillNotifications?.enabled ? 'translate-x-7' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Volume */}
+          <div className="py-4 border-b">
+            <div className="flex items-center justify-between mb-2">
+              <label className="font-medium text-slate-800">Volume</label>
+              <span className="text-sm text-slate-600 font-mono">
+                {settings.tmbillNotifications?.volume ?? 80}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={settings.tmbillNotifications?.volume ?? 80}
+              onChange={(e) => dispatch(setTmbillNotificationVolume(Number(e.target.value)))}
+              disabled={!settings.tmbillNotifications?.enabled}
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <div className="flex justify-between text-xs text-slate-500 mt-1">
+              <span>Silent</span>
+              <span>Loud</span>
+            </div>
+          </div>
+
+          {/* Custom sound file picker */}
+          <div className="py-4 border-b">
+            <p className="font-medium text-slate-800 mb-1">Notification Sound</p>
+            <p className="text-sm text-slate-500 mb-3">
+              {settings.tmbillNotifications?.customSoundPath
+                ? `Custom: ${settings.tmbillNotifications.customSoundPath.split(/[\\/]/).pop()}`
+                : 'Default (same as CocoEats new order sound)'}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  const path = await window.electron.pickAudioFile();
+                  if (path) {
+                    dispatch(setTmbillCustomSoundPath(path));
+                    audioNotificationService.reloadTmbillSound(path);
+                    toast.success('Custom sound saved');
+                  }
+                }}
+                disabled={!settings.tmbillNotifications?.enabled}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Choose File
+              </button>
+              {settings.tmbillNotifications?.customSoundPath && (
+                <button
+                  onClick={() => {
+                    dispatch(setTmbillCustomSoundPath(null));
+                    audioNotificationService.reloadTmbillSound(null);
+                    toast.success('Reset to default sound');
+                  }}
+                  className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm transition-colors"
+                >
+                  Reset to Default
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Test button */}
+          <div className="pt-4">
+            <button
+              onClick={() => audioNotificationService.testTmbillSound()}
+              disabled={!settings.tmbillNotifications?.enabled}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+            >
+              <Play className="w-4 h-4" />
+              Test TMBILL Sound
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Interaction Settings */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">

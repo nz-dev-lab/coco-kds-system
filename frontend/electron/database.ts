@@ -95,7 +95,7 @@ console.log('✅ Database initialized successfully');
 export const statements = {
   // Insert completed order
   insertOrder: db.prepare(`
-    INSERT INTO completed_orders (
+    INSERT OR IGNORE INTO completed_orders (
       id, created_at, completed_at, bumped_at, order_type, order_status,
       order_amount, payment_method, item_count, items, prep_time_minutes,
       delivery_man_id, restaurant_id, customer_name, bumped_by_user

@@ -1,6 +1,7 @@
 // src/hooks/useWebSocket.ts
 import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { store } from '../store';
 import { addOrder, updateOrder } from '../store/slices/ordersSlice';
 import { io, Socket } from 'socket.io-client';
 import { Order } from '@/types/order.type';
@@ -207,11 +208,18 @@ export function useWebSocket() {
 
       if (transformedOrder && transformedOrder.items && transformedOrder.items.length > 0) {
         console.log('✅ Order transformed successfully:', transformedOrder);
+        // Check BEFORE dispatching — if the order is already in Redux (fetched from API
+        // on startup, or a duplicate socket event on reconnect) skip notification/print.
+        const alreadyExists = (store.getState() as any).orders.orders.some(
+          (o: any) => String(o.id) === String(transformedOrder.id)
+        );
         dispatch(addOrder(transformedOrder));
-        audioNotificationService.playNewOrderNotification();
+        if (!alreadyExists) {
+          audioNotificationService.playNewOrderNotification();
+        }
 
         // Auto-print if enabled in settings
-        if (autoPrintRef.current) {
+        if (!alreadyExists && autoPrintRef.current) {
           console.log('🖨️ Auto-printing order:', transformedOrder.id);
           printWithSelectionRef.current(transformedOrder).catch((err) => {
             console.error('❌ Auto-print failed:', err);

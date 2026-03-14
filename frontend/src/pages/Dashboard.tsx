@@ -1,5 +1,5 @@
 // src/pages/Dashboard.tsx
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useContext } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchOrders, selectCocoeatsBumpedOrders } from '../store/slices/ordersSlice';
 import { selectTmbillConnected, selectTmbillBumpedOrders } from '../store/slices/tmbillOrdersSlice';
@@ -9,12 +9,11 @@ import TmbillOrderCard from '../components/orders/TmbillOrderCard';
 import KitchenOrderCard from '../components/orders/KitchenOrderCard';
 import { runTmbillAutoConnect } from '@/hooks/useTmbillOrders';
 import { RefreshCw, Clock, Wifi, WifiOff, ScanSearch, ChevronDown, ChevronUp, ShoppingBag, DollarSign, TrendingUp } from 'lucide-react';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import { useKdsServerBroadcast } from '@/hooks/useKdsServerBroadcast';
-import { useKdsClient } from '@/hooks/useKdsClient';
+import { KdsClientContext } from '../App';
 import { useStationFilter } from '@/hooks/useStationFilter';
 import { useLiveClock } from '../hooks/useLiveClock';
 import { clearRecentlyUpdated, releaseFocus, type StationView } from '@/store/slices/uiSlice';
+import { kdsLog } from '@/utils/kdsLogger';
 
 // Isolated clock component — updates every second without re-rendering Dashboard
 function LiveClockDisplay() {
@@ -175,18 +174,18 @@ export default function Dashboard() {
   const [tmbillScanning, setTmbillScanning] = useState(false);
   const [showBumped, setShowBumped] = useState(false);
 
-  const kdsClient = useKdsClient();
-
-  useWebSocket();
-  useKdsServerBroadcast();
+  const kdsClient = useContext(KdsClientContext);
 
   useEffect(() => {
     // Kitchen screens in client mode get orders from the KDS host via WebSocket —
     // skip fetching from the CocoEats API.
-    if (kdsClient.active) return;
-
+    if (kdsClient.active) {
+      kdsLog(`[Dashboard] kdsClient active — skipping fetchOrders (connected=${kdsClient.connected} stabilizing=${kdsClient.stabilizing})`, 'client');
+      return;
+    }
+    kdsLog('[Dashboard] mount — dispatching fetchOrders (host/standalone mode)', 'host');
     dispatch(fetchOrders());
-  }, [dispatch, kdsClient.active]);
+  }, [dispatch, kdsClient.active, kdsClient.connected]);
 
   useEffect(() => {
   return () => {
@@ -247,12 +246,21 @@ export default function Dashboard() {
   // Apply the same status filter as a safety net — prevents stale handover orders
   // from appearing if the server sent them before cachedOrders was fully refreshed.
   const filteredOrders = kdsClient.active
-    ? kdsClient.orders.filter((order: any) => {
+    ? (kdsClient.stabilizing ? [] : kdsClient.orders.filter((order: any) => {
         if (order._source === 'tmbill' && order.status === 'handover') return false;
         if (order.order_status === 'delivered' || order.order_status === 'picked_up') return false;
         return true;
-      })
+      }))
     : stationFilteredOrders;
+
+  // ── Debug: track filteredOrders changes to diagnose the blink ────────────
+  useEffect(() => {
+    const src = kdsClient.active ? 'client' : 'host';
+    kdsLog(
+      `[Dashboard] filteredOrders=${filteredOrders.length} | kdsClientOrders=${kdsClient.orders.length} | reduxOrders=${orders.length} | active=${kdsClient.active} connected=${kdsClient.connected} stabilizing=${kdsClient.stabilizing}`,
+      src,
+    );
+  }, [filteredOrders.length, kdsClient.orders.length, kdsClient.active, kdsClient.connected, orders.length]);
 
   const handleRefresh = () => {
     dispatch(fetchOrders());

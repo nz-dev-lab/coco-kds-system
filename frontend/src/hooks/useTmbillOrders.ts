@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import type { AppDispatch } from '@/store';
+import { audioNotificationService } from '@/utils/audioNotifications';
+import { kdsLog } from '@/utils/kdsLogger';
 import {
   setTmbillOrders,
   removeTmbillOrder,
@@ -205,6 +207,13 @@ export function useTmbillOrders() {
   const dispatch = useAppDispatch();
   const stationView = useAppSelector((s) => s.ui.settings.stationView ?? 'all');
 
+  // Track known order IDs to detect genuinely new orders on each refresh (running + settled)
+  const knownRunningIdsRef  = useRef<Set<string>>(new Set());
+  const knownSettledIdsRef  = useRef<Set<string>>(new Set());
+  // Skip notification on the very first refresh after mount — those orders already exist,
+  // we're just populating the baseline. Without this, a reload notifies for every open order.
+  const isFirstRefreshRef   = useRef(true);
+
   // ── Connection + scan + retry ──────────────────────────────────────────
   useEffect(() => {
     if (!window.tmbill) return;
@@ -221,11 +230,11 @@ export function useTmbillOrders() {
       await runTmbillAutoConnect(dispatch);
 
       if (stopped) return;
-      // If still not connected after the attempt, schedule retry
-      const state = await window.tmbill.getState();
-      if (!state.connected || !state.authenticated) {
-        retryTimer = setTimeout(doAutoConnect, RETRY_INTERVAL);
-      }
+      // Always schedule next check — handles both retry-on-failure and reconnect
+      // detection if the POS drops after a successful initial connection.
+      // When already connected, runTmbillAutoConnect just calls fetchRunningTables()
+      // and returns, so this also acts as a periodic order-list refresh.
+      retryTimer = setTimeout(doAutoConnect, RETRY_INTERVAL);
     }
 
     doAutoConnect();
@@ -239,9 +248,47 @@ export function useTmbillOrders() {
   // ── Real-time event listeners ──────────────────────────────────────────
   useEffect(() => {
     if (!window.tmbill) return;
-    if (stationView !== 'all') return;
+    if (stationView !== 'all') {
+      kdsLog(`[TMBILL] event listeners NOT registered — stationView is '${stationView}' (only 'all' receives notifications)`, 'host', 'warn');
+      return;
+    }
+    kdsLog(`[TMBILL] event listeners registered (stationView='all')`, 'host');
 
     const unsubRefresh = window.tmbill.onOrdersRefreshed((data) => {
+      // Detect new orders by diffing running + settled against known IDs
+      const incomingRunning = new Set<string>(data.running.map((o: any) => String(o.id)));
+      // settled orders are sent raw from the plugin — their identifier is order_id, not id
+      const incomingSettled = new Set<string>(data.settled.map((o: any) => String(o.order_id ?? o.id)));
+
+      kdsLog(`[TMBILL] onOrdersRefreshed — running: ${data.running.length}, settled: ${data.settled.length} | known running: ${knownRunningIdsRef.current.size}, known settled: ${knownSettledIdsRef.current.size}`, 'host');
+
+      // First refresh after mount: just snapshot current IDs as baseline, no notification.
+      // Without this, every reload fires a notification for all existing open orders.
+      if (isFirstRefreshRef.current) {
+        isFirstRefreshRef.current      = false;
+        knownRunningIdsRef.current     = incomingRunning;
+        knownSettledIdsRef.current     = incomingSettled;
+        kdsLog(`[TMBILL] first refresh — baseline snapshot taken, notification suppressed`, 'host');
+        dispatch(setTmbillOrders({ running: data.running, settled: data.settled }));
+        return;
+      }
+
+      const newRunning = [...incomingRunning].filter((id) => !knownRunningIdsRef.current.has(id));
+      const newSettled = [...incomingSettled].filter((id) => !knownSettledIdsRef.current.has(id));
+
+      kdsLog(`[TMBILL] diff — new running: [${newRunning.join(', ') || 'none'}], new settled: [${newSettled.join(', ') || 'none'}]`, 'host');
+
+      if (newRunning.length > 0 || newSettled.length > 0) {
+        console.log(`🔔 New TMBILL orders — running: ${newRunning.length}, settled (quickbill): ${newSettled.length}`);
+        kdsLog(`[TMBILL] 🔔 triggering notification — running: ${newRunning.length}, quickbill: ${newSettled.length}`, 'host');
+        audioNotificationService.playTmbillNotification();
+      } else {
+        kdsLog(`[TMBILL] no new orders — notification skipped`, 'host');
+      }
+
+      knownRunningIdsRef.current = incomingRunning;
+      knownSettledIdsRef.current = incomingSettled;
+
       dispatch(setTmbillOrders({ running: data.running, settled: data.settled }));
     });
 
