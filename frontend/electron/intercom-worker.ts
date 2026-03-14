@@ -40,12 +40,8 @@ const client = new TailcomClient({ port: INTERCOM_PORT, autoAccept });
 
 let callStartTime: number | null = null;
 
-client.on('local-level',  (rms: number) => {
-  (process as any).parentPort?.postMessage({ type: 'audio-level', channel: 'local', rms });
-});
-client.on('remote-level', (rms: number) => {
-  (process as any).parentPort?.postMessage({ type: 'audio-level', channel: 'remote', rms });
-});
+client.on('local-level',  (rms: number) => { process.send?.({ type: 'audio-level', channel: 'local', rms }); });
+client.on('remote-level', (rms: number) => { process.send?.({ type: 'audio-level', channel: 'remote', rms }); });
 
 client.on('incoming-call', () => console.log('[intercom] incoming-call'));
 client.on('call-started',  () => {
@@ -59,10 +55,10 @@ client.on('call-ended', () => {
 });
 client.on('error', (err: any) => console.error('[intercom] error:', err.message, err.stack ?? ''));
 
-// Accept / reject commands sent from the main process via utilityProcess IPC
-;(process as any).parentPort?.on('message', (e: { data: { type: string } }) => {
-  if (e.data.type === 'accept') client.acceptCall();
-  if (e.data.type === 'reject') client.rejectCall();
+// Accept / reject commands sent from the main process via IPC
+process.on('message', (msg: { type: string }) => {
+  if (msg.type === 'accept') client.acceptCall();
+  if (msg.type === 'reject') client.rejectCall();
 });
 
 client.start()

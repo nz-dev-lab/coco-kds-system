@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, utilityProcess, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import fs from 'fs';
-import { exec } from 'child_process';
+import { exec, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 const execAsync = promisify(exec);
 import { autoUpdater } from 'electron-updater';
@@ -32,9 +32,9 @@ import { startKdsServer, broadcastOrders, getClientCount, stopKdsServer, getLoca
 let mainWindow: BrowserWindow | null = null;
 const isDev = process.env.NODE_ENV === 'development';
 let tmbillPlugin: TMBillPlugin | null = null;
-// utilityProcess runs inside Electron's bundled Node.js — no system Node required.
-// It does NOT load Chromium's WebRTC, so @roamhq/wrtc can start safely.
-let intercomWorker: ReturnType<typeof utilityProcess.fork> | null = null;
+// Worker runs as a plain Node.js child process (ELECTRON_RUN_AS_NODE=1) to avoid
+// utilityProcess Win32 sandbox restrictions that crash @roamhq/wrtc ICE gathering.
+let intercomWorker: ChildProcess | null = null;
 let intercomReady = false;
 
 // ── Circular log buffer — last 150 lines from worker stdout/stderr ────────────
@@ -49,10 +49,15 @@ function pushIntercomLog(line: string) {
 function startIntercomWorker(): void {
   intercomLogs.length = 0; // clear on each (re)start
   const workerPath = path.join(__dirname, 'intercom-worker.js');
-  const worker = utilityProcess.fork(workerPath, [], {
-    stdio: 'pipe',
-    cwd: path.join(app.getAppPath(), '..'), // ensures node_modules is resolvable
-    env: { ...process.env, TAILCOM_AUTO_ACCEPT: process.env.TAILCOM_AUTO_ACCEPT },
+  // In packaged app the worker must come from app.asar.unpacked (not inside asar)
+  // so the OS can load it as a plain Node.js script with full Win32 network access.
+  const unpackedWorkerPath = workerPath.includes('app.asar')
+    ? workerPath.replace('app.asar', 'app.asar.unpacked')
+    : workerPath;
+  const worker = spawn(process.execPath, [unpackedWorkerPath], {
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    cwd: path.join(app.getAppPath(), '..'),
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', TAILCOM_AUTO_ACCEPT: process.env.TAILCOM_AUTO_ACCEPT },
   });
   worker.stdout?.on('data', (d: Buffer) => {
     const lines = d.toString().trimEnd().split('\n');
@@ -479,11 +484,11 @@ ipcMain.handle('intercom:get-status', () => ({
 ipcMain.handle('intercom:get-logs', () => [...intercomLogs]);
 
 ipcMain.handle('intercom:accept-call', () => {
-  intercomWorker?.postMessage({ type: 'accept' });
+  intercomWorker?.send({ type: 'accept' });
 });
 
 ipcMain.handle('intercom:reject-call', () => {
-  intercomWorker?.postMessage({ type: 'reject' });
+  intercomWorker?.send({ type: 'reject' });
 });
 
 // CONFIG IPC HANDLERS
