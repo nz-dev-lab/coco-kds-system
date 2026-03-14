@@ -1,6 +1,6 @@
 {
   "name": "kds-frontend",
-  "version": "1.2.11",
+  "version": "1.2.12",
   "description": "CocoFlow - Restaurant Operations Platform",
   "main": "dist-electron/main.js",
   "author": "Nz-Dev-Lab",
@@ -87,7 +87,10 @@
       "**/*.mp3",
       "**/*.wav",
       "**/*.ogg",
-      "**/dist-electron/intercom-worker.js"
+      "**/dist-electron/intercom-worker.js",
+      "**/node_modules/tailcom-client/**",
+      "**/node_modules/@roamhq/wrtc/**",
+      "**/node_modules/node-record-lpcm16/**"
     ],
     "extraMetadata": {
       "main": "dist-electron/main.js"

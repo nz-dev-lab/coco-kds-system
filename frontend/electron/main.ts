@@ -77,7 +77,11 @@ function startIntercomWorker(): void {
     env: {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
-      NODE_PATH: path.join(app.getAppPath(), 'node_modules'),
+      // For system node.exe: point to unpacked modules (asar not readable by system node)
+      // For Electron binary: asar path works via Electron's asar patch
+      NODE_PATH: app.getAppPath().includes('app.asar')
+        ? path.join(app.getAppPath(), '..', 'app.asar.unpacked', 'node_modules')
+        : path.join(app.getAppPath(), 'node_modules'),
       TAILCOM_AUTO_ACCEPT: process.env.TAILCOM_AUTO_ACCEPT,
     },
   });
