@@ -1,6 +1,6 @@
 // src/components/IncomingCallBar.tsx
 // Global incoming-call overlay — rendered at the app root so it appears on every page.
-// Only mounted when talecom is enabled (talecomEnabled flag from preload).
+// Only mounted when tailcom is enabled (tailcomEnabled flag from preload).
 
 import { useEffect, useState, useCallback } from 'react';
 import { Phone, PhoneOff } from 'lucide-react';

@@ -1,7 +1,7 @@
 // src/App.tsx
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useRef } from 'react';
-import { useAppSelector } from './store/hooks';
+import { useAppSelector, useAppDispatch } from './store/hooks';
 import MainLayout from './components/Layout/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
@@ -27,6 +27,7 @@ export const KdsClientContext = React.createContext<KdsClientState>({
 import { store } from './store';
 import { addOrder } from './store/slices/ordersSlice';
 import { setTmbillOrders } from './store/slices/tmbillOrdersSlice';
+import { addFlashOrder } from './store/slices/uiSlice';
 import { audioNotificationService } from './utils/audioNotifications';
 
 import History from './pages/History';
@@ -108,8 +109,10 @@ import Utilities from './pages/Utilities';
     };
     const current = (store.getState() as any).tmbillOrders;
     store.dispatch(setTmbillOrders({ running: [...(current?.running ?? []), mockRunning], settled: current?.settled ?? [] }));
-    audioNotificationService.playTmbillNotification();
-    console.log('✅ Test TMBILL order dispatched + TMBILL notification triggered');
+    store.dispatch(addFlashOrder('TMBILL-99999'));
+    const repeatCount = (store.getState() as any).ui.settings.audioNotifications.notificationRepeatCount ?? 3;
+    audioNotificationService.playTmbillNotification(repeatCount);
+    console.log(`✅ Test TMBILL order dispatched + TMBILL notification triggered (×${repeatCount})`);
 };
 
 // Protected Route Component
@@ -124,12 +127,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const debugMode = useAppSelector((s) => s.ui.settings.debugMode ?? false);
+  const notificationRepeatCount = useAppSelector(
+    (s) => s.ui.settings.audioNotifications.notificationRepeatCount ?? 3
+  );
   useTmbillOrders();       // Keep TMBILL orders in sync across all pages
   useWebSocket();          // Keep CocoEats WebSocket alive across all pages
   useKdsServerBroadcast(); // Keep KDS host broadcast alive across all pages
   const kdsClient = useKdsClient(); // Keep KDS client connection alive across all pages
+
+  // Ref so the kdsClient effect always reads the latest repeat count without re-subscribing
+  const repeatCountRef = useRef(notificationRepeatCount);
+  repeatCountRef.current = notificationRepeatCount;
 
   // Sync debug mode into the kdsLogger module — enables/disables log capture globally
   useEffect(() => {
@@ -166,16 +177,19 @@ function App() {
       const tmbillIds   = newOrders.filter((o: any) => o._source === 'tmbill').map((o: any) => String(o.id));
       const cocoEatsIds = newOrders.filter((o: any) => o._source !== 'tmbill').map((o: any) => String(o.id));
       kdsLog(`[KDS Client] new orders — tmbill: [${tmbillIds.join(', ') || 'none'}], cocoeats: [${cocoEatsIds.join(', ') || 'none'}]`, 'client');
-      if (tmbillIds.length > 0)   audioNotificationService.playTmbillNotification();
-      if (cocoEatsIds.length > 0) audioNotificationService.playNewOrderNotification();
+      const repeat = repeatCountRef.current;
+      if (tmbillIds.length > 0)   audioNotificationService.playTmbillNotification(repeat);
+      if (cocoEatsIds.length > 0) audioNotificationService.playNewOrderNotification(repeat);
+      // Flash new order cards on kitchen screen
+      newOrders.forEach((o: any) => dispatch(addFlashOrder(String(o.id))));
     }
     knownKdsOrderIdsRef.current = currentIds;
-  }, [kdsClient.orders, kdsClient.stabilizing, kdsClient.active]);
+  }, [kdsClient.orders, kdsClient.stabilizing, kdsClient.active, dispatch]);
 
   return (
     <KdsClientContext.Provider value={kdsClient}>
     <UpdateManager />
-    {window.electron?.talecomEnabled && <IncomingCallBar />}
+    {window.electron?.tailcomEnabled && <IncomingCallBar />}
       <HashRouter>
         <Routes>
           {/* Public Route: Login */}

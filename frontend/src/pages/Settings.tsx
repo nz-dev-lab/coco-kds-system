@@ -21,6 +21,7 @@ import {
   toggleTmbillNotifications,
   setTmbillNotificationVolume,
   setTmbillCustomSoundPath,
+  setTmbillScheduledAlertMinutes,
   type StationView,
 } from '../store/slices/uiSlice';
 import { audioNotificationService } from '../utils/audioNotifications';
@@ -665,6 +666,32 @@ export default function Settings() {
                   Reset to Default
                 </button>
               )}
+            </div>
+          </div>
+
+          {/* Scheduled order alert threshold */}
+          <div className="py-4 border-b">
+            <div className="flex items-center justify-between mb-1">
+              <label className="font-medium text-slate-800">Scheduled Order Alert</label>
+              <span className="text-sm text-slate-600 font-mono">
+                {settings.tmbillNotifications?.scheduledAlertMinutes ?? 30} min before
+              </span>
+            </div>
+            <p className="text-sm text-slate-500 mb-3">
+              Play the ready chime this many minutes before a scheduled TMBILL order's time.
+            </p>
+            <input
+              type="range"
+              min="5"
+              max="60"
+              step="5"
+              value={settings.tmbillNotifications?.scheduledAlertMinutes ?? 30}
+              onChange={(e) => dispatch(setTmbillScheduledAlertMinutes(Number(e.target.value)))}
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-slate-500 mt-1">
+              <span>5 min</span>
+              <span>60 min</span>
             </div>
           </div>
 

@@ -3,14 +3,14 @@
 // Excluded: print, delivery modal, scheduled logic, CocoEats-specific fields.
 // Status progression calls window.tmbill IPC instead of CocoEats API.
 
-import { Bike, Check, ClipboardList, CookingPot, RectangleEllipsis, ShoppingBag, Store, User, Zap } from 'lucide-react';
+import { Bike, Check, ClipboardList, Clock, CookingPot, RectangleEllipsis, ShoppingBag, Store, User, X, Zap } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { toggleTmbillItemReady, bumpTmbillOrder, recallTmbillOrder, markAllTmbillItemsReady } from '../../store/slices/tmbillOrdersSlice';
-import { markOrderAsViewed } from '../../store/slices/ordersSlice';
-import { memo, useCallback, useEffect, useState } from 'react';
+import { toggleTmbillItemReady, bumpTmbillOrder, recallTmbillOrder, markAllTmbillItemsReady, setTmbillScheduledOverride } from '../../store/slices/tmbillOrdersSlice';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { CocoKDSOrder } from '../../../electron/plugins/tmbill/transformer';
-import { setFocusedOrder, addRecentlyUpdated, releaseFocus, removeRecentlyUpdated } from '../../store/slices/uiSlice';
+import { setFocusedOrder, addRecentlyUpdated, releaseFocus, removeRecentlyUpdated, clearFlashOrder } from '../../store/slices/uiSlice';
+import { detectScheduledTime, getTmbillScheduleInfo, parseManualTime, formatTmbillCountdown } from '../../utils/scheduledTmbillUtils';
 
 interface TmbillOrderCardProps {
   order: CocoKDSOrder;
@@ -32,14 +32,37 @@ function TmbillOrderCard({ order, gridPosition, isBumped = false }: TmbillOrderC
   const itemNameOverflowClass = (itemNameFontSize === 'lg' || itemNameFontSize === 'xl') ? 'line-clamp-2 break-words' : 'truncate';
   const focusedOrderId   = useAppSelector((s) => s.ui.focusedOrderId);
   const recentlyUpdatedIds = useAppSelector((s) => s.ui.recentlyUpdatedOrderIds);
-  const isNewOrder = useAppSelector((s) => s.orders.newOrderIds.includes(order.id));
+  const isNewOrder = useAppSelector((s) => s.ui.flashOrderIds?.includes(order.id) ?? false);
 
   const isFocused         = order.id === focusedOrderId;
   const isRecentlyUpdated = recentlyUpdatedIds.includes(order.id);
   const isHeaderMode      = processingMode === 'header';
 
+  const scheduledOverride  = useAppSelector((s) => (s as any).tmbill.scheduledOverrides?.[order.id] ?? null);
+  const alertMinutes       = useAppSelector((s) => s.ui.settings.tmbillNotifications?.scheduledAlertMinutes ?? 30);
+
+  // ── Scheduled time detection ──────────────────────────────────────────────
+  const scheduleInfo = useMemo(() => {
+    let scheduledTime: Date | null = null;
+    let confidence: 'high' | 'medium' | 'none' = 'none';
+    if (scheduledOverride) {
+      scheduledTime = new Date(scheduledOverride);
+      confidence = 'high';
+    } else {
+      const detected = detectScheduledTime(order, currentTime);
+      if (detected) { scheduledTime = detected.scheduledTime; confidence = detected.confidence; }
+    }
+    return getTmbillScheduleInfo(scheduledTime, confidence, alertMinutes, currentTime);
+  }, [scheduledOverride, order, alertMinutes, currentTime]);
+
   const [showAnimation, setShowAnimation] = useState(isNewOrder);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // ── Time picker state ─────────────────────────────────────────────────────
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickerHour,   setPickerHour]   = useState('');
+  const [pickerMinute, setPickerMinute] = useState('00');
+  const [pickerAmPm,   setPickerAmPm]   = useState<'am' | 'pm'>('pm');
 
   const items = order.items || [];
 
@@ -53,8 +76,10 @@ function TmbillOrderCard({ order, gridPosition, isBumped = false }: TmbillOrderC
     ? calculateOrderAge(order.created_at, order.order_age_minutes)
     : order.order_age_minutes;
 
-  // ── Age border (same logic as OrderCard, without scheduled branches) ──────
+  // ── Age border — amber/red override when scheduled order is approaching/overdue
   const getAgeBorderColor = () => {
+    if (scheduleInfo.detected && scheduleInfo.isOverdue)    return 'border-l-red-600';
+    if (scheduleInfo.detected && scheduleInfo.isApproaching) return 'border-l-purple-500';
     if (orderAge < 15) return 'border-l-green-500';
     if (orderAge < 30) return 'border-l-yellow-500';
     return 'border-l-red-500';
@@ -99,7 +124,7 @@ function TmbillOrderCard({ order, gridPosition, isBumped = false }: TmbillOrderC
   const stopAnimation = useCallback(() => {
     if (showAnimation) {
       setShowAnimation(false);
-      dispatch(markOrderAsViewed(order.id));
+      dispatch(clearFlashOrder(order.id));
     }
   }, [showAnimation, dispatch, order.id]);
 
@@ -107,7 +132,7 @@ function TmbillOrderCard({ order, gridPosition, isBumped = false }: TmbillOrderC
     if (!isNewOrder || !showAnimation) return;
     const t = setTimeout(() => {
       setShowAnimation(false);
-      dispatch(markOrderAsViewed(order.id));
+      dispatch(clearFlashOrder(order.id));
     }, 60_000);
     return () => clearTimeout(t);
   }, [isNewOrder, showAnimation, order.id, dispatch]);
@@ -315,7 +340,7 @@ function TmbillOrderCard({ order, gridPosition, isBumped = false }: TmbillOrderC
 
         {/* Header — same structure as OrderCard */}
         <div
-          className={`${config.bg} px-3 sm:px-4 py-3 rounded-t-lg ${isHeaderMode ? 'cursor-pointer select-none' : ''} ${isFocused ? 'relative' : ''}`}
+          className={`${config.bg} px-3 sm:px-4 py-3 rounded-t-lg group/header ${isHeaderMode ? 'cursor-pointer select-none' : ''} ${isFocused ? 'relative' : ''}`}
           onDoubleClick={isHeaderMode ? handleHeaderDoubleTap : undefined}
           title={isHeaderMode ? 'Double-tap header to progress order' : undefined}
         >
@@ -347,14 +372,136 @@ function TmbillOrderCard({ order, gridPosition, isBumped = false }: TmbillOrderC
               </span>
             </div>
 
-            {/* Right: Age */}
+            {/* Right: Age + clock button */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
               <span className="text-white text-xs sm:text-sm font-semibold whitespace-nowrap">
                 {formatTime(orderAge)}
               </span>
+              {/* Clock button — opens time picker to set/override scheduled time */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Pre-fill picker from existing schedule if any
+                  if (scheduleInfo.scheduledTime) {
+                    const h = scheduleInfo.scheduledTime.getHours();
+                    const m = scheduleInfo.scheduledTime.getMinutes();
+                    setPickerHour(String(h > 12 ? h - 12 : h === 0 ? 12 : h));
+                    setPickerMinute(String(m).padStart(2, '0'));
+                    setPickerAmPm(h >= 12 ? 'pm' : 'am');
+                  } else {
+                    setPickerHour('');
+                    setPickerMinute('00');
+                    setPickerAmPm('pm');
+                  }
+                  setShowTimePicker((v) => !v);
+                }}
+                className={`p-1 rounded transition-all flex-shrink-0 ${
+                  scheduleInfo.detected || scheduledOverride
+                    ? 'bg-purple-500/80 hover:bg-purple-400 text-white opacity-100'
+                    : 'bg-white/20 hover:bg-white/30 text-white opacity-0 group-hover/header:opacity-100'
+                }`}
+                title={scheduleInfo.detected ? `Scheduled: ${scheduleInfo.scheduledTimeFormatted} — tap to edit` : 'Set scheduled time'}
+              >
+                <Clock className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </div>
+
+        {/* Scheduled badge strip */}
+        {scheduleInfo.detected && (
+          <div className={`px-3 py-1.5 flex items-center justify-between gap-2 text-xs font-semibold ${
+            scheduleInfo.isOverdue
+              ? 'bg-red-100 text-red-700'
+              : scheduleInfo.isApproaching
+              ? 'bg-purple-100 text-purple-800'
+              : 'bg-purple-50 text-purple-700'
+          }`}>
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>
+                {scheduleInfo.isOverdue
+                  ? `Overdue by ${formatTmbillCountdown(scheduleInfo.minutesUntil ?? 0)}`
+                  : scheduleInfo.isApproaching
+                  ? `${scheduleInfo.scheduledTimeFormatted} — in ${formatTmbillCountdown(scheduleInfo.minutesUntil ?? 0)}`
+                  : `Scheduled ${scheduleInfo.scheduledTimeFormatted} — in ${formatTmbillCountdown(scheduleInfo.minutesUntil ?? 0)}`
+                }
+              </span>
+              {scheduleInfo.confidence === 'medium' && (
+                <span className="opacity-60 text-[10px]">(inferred)</span>
+              )}
+            </div>
+            {/* Clear override button */}
+            {scheduledOverride && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dispatch(setTmbillScheduledOverride({ orderId: order.id, isoTime: null }));
+                }}
+                className="opacity-60 hover:opacity-100 transition-opacity"
+                title="Clear manual schedule"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Time picker popover */}
+        {showTimePicker && (
+          <div
+            className="bg-white border border-slate-200 shadow-lg rounded-b-lg px-4 py-3 flex items-center gap-3 flex-wrap"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={1} max={12}
+                placeholder="7"
+                value={pickerHour}
+                onChange={(e) => setPickerHour(e.target.value)}
+                className="w-14 border border-slate-300 rounded px-2 py-1 text-sm text-center text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <span className="text-slate-700 font-bold">:</span>
+              <input
+                type="number"
+                min={0} max={59}
+                placeholder="00"
+                value={pickerMinute}
+                onChange={(e) => setPickerMinute(String(e.target.value).padStart(2, '0'))}
+                className="w-14 border border-slate-300 rounded px-2 py-1 text-sm text-center text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            {/* AM/PM toggle */}
+            <div className="flex rounded overflow-hidden border border-slate-300 text-sm font-semibold flex-shrink-0">
+              {(['am', 'pm'] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setPickerAmPm(v)}
+                  className={`px-3 py-1 transition-colors ${pickerAmPm === v ? 'bg-blue-500 text-white' : 'bg-white text-slate-900 hover:bg-slate-100'}`}
+                >
+                  {v.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                const date = parseManualTime(`${pickerHour}:${pickerMinute}`, pickerAmPm);
+                if (date) dispatch(setTmbillScheduledOverride({ orderId: order.id, isoTime: date.toISOString() }));
+                setShowTimePicker(false);
+              }}
+              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-semibold flex-shrink-0"
+            >
+              Set
+            </button>
+            <button
+              onClick={() => setShowTimePicker(false)}
+              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-sm flex-shrink-0"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4">

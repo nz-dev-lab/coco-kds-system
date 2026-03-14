@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import type { AppDispatch } from '@/store';
+import { store } from '@/store';
 import { audioNotificationService } from '@/utils/audioNotifications';
 import { kdsLog } from '@/utils/kdsLogger';
 import {
@@ -11,6 +12,8 @@ import {
   setTmbillConnected,
   setTmbillMenu,
 } from '@/store/slices/tmbillOrdersSlice';
+import { addFlashOrder } from '@/store/slices/uiSlice';
+import { detectScheduledTime, getTmbillScheduleInfo } from '@/utils/scheduledTmbillUtils';
 
 const TMBILL_PORT    = 3000;
 const RETRY_INTERVAL = 30_000; // retry every 30s when POS not found
@@ -214,6 +217,72 @@ export function useTmbillOrders() {
   // we're just populating the baseline. Without this, a reload notifies for every open order.
   const isFirstRefreshRef   = useRef(true);
 
+  // ── Scheduled order alert interval ────────────────────────────────────────
+  // Fires every 60s; checks all running TMBILL orders for approaching/overdue times.
+  // Uses store.getState() inside the interval so it always reads the latest values
+  // without needing to re-register the interval on every Redux state change.
+  const approachingAlertedRef = useRef<Set<string>>(new Set()); // alerted for approaching
+  const overdueAlertedRef     = useRef<Set<string>>(new Set()); // alerted for overdue
+
+  useEffect(() => {
+    if (!window.tmbill) return;
+    if (stationView !== 'all') return;
+
+    function checkScheduledOrders() {
+      const state = store.getState() as any;
+      const runningOrders: any[] = state.tmbill.runningOrders ?? [];
+      const overrides: Record<string, string> = state.tmbill.scheduledOverrides ?? {};
+      const alertMinutes: number =
+        state.ui.settings.tmbillNotifications?.scheduledAlertMinutes ?? 30;
+      const now = new Date();
+
+      for (const order of runningOrders) {
+        const orderId = String(order.id);
+
+        // Resolve scheduled time: manual override takes priority over auto-detect
+        let scheduledTime: Date | null = null;
+        let confidence: 'high' | 'medium' | 'none' = 'none';
+
+        if (overrides[orderId]) {
+          scheduledTime = new Date(overrides[orderId]);
+          confidence = 'high';
+        } else {
+          const detected = detectScheduledTime(order, now);
+          if (detected) {
+            scheduledTime = detected.scheduledTime;
+            confidence = detected.confidence;
+          }
+        }
+
+        if (!scheduledTime || confidence === 'none') continue;
+
+        const info = getTmbillScheduleInfo(scheduledTime, confidence, alertMinutes, now);
+
+        if (info.isOverdue && !overdueAlertedRef.current.has(orderId)) {
+          overdueAlertedRef.current.add(orderId);
+          kdsLog(`[TMBILL Scheduled] Order ${orderId} overdue — firing overdue alert`, 'host');
+          audioNotificationService.playOverdueWarning(orderId);
+        } else if (info.isApproaching && !approachingAlertedRef.current.has(orderId)) {
+          approachingAlertedRef.current.add(orderId);
+          kdsLog(`[TMBILL Scheduled] Order ${orderId} approaching (${info.minutesUntil}min) — firing ready alert`, 'host');
+          audioNotificationService.playReadyNotification(orderId);
+        }
+      }
+
+      // Prune alerted sets to orders still present (prevents unbounded growth)
+      const presentIds = new Set(runningOrders.map((o: any) => String(o.id)));
+      for (const id of approachingAlertedRef.current) {
+        if (!presentIds.has(id)) approachingAlertedRef.current.delete(id);
+      }
+      for (const id of overdueAlertedRef.current) {
+        if (!presentIds.has(id)) overdueAlertedRef.current.delete(id);
+      }
+    }
+
+    const interval = setInterval(checkScheduledOrders, 60_000);
+    return () => clearInterval(interval);
+  }, [stationView]);
+
   // ── Connection + scan + retry ──────────────────────────────────────────
   useEffect(() => {
     if (!window.tmbill) return;
@@ -281,7 +350,12 @@ export function useTmbillOrders() {
       if (newRunning.length > 0 || newSettled.length > 0) {
         console.log(`🔔 New TMBILL orders — running: ${newRunning.length}, settled (quickbill): ${newSettled.length}`);
         kdsLog(`[TMBILL] 🔔 triggering notification — running: ${newRunning.length}, quickbill: ${newSettled.length}`, 'host');
+        // Host screen plays once (no repeat — repeat is for kitchen screens only)
         audioNotificationService.playTmbillNotification();
+        // Flash new order cards on the host screen
+        newRunning.forEach((id) => dispatch(addFlashOrder(id)));
+        // Settled orders transform to QB-{order_id} — match the card's order.id format
+        newSettled.forEach((rawId) => dispatch(addFlashOrder(`QB-${rawId}`)));
       } else {
         kdsLog(`[TMBILL] no new orders — notification skipped`, 'host');
       }

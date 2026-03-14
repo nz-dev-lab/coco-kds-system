@@ -37,30 +37,61 @@ let tmbillPlugin: TMBillPlugin | null = null;
 let intercomWorker: ReturnType<typeof utilityProcess.fork> | null = null;
 let intercomReady = false;
 
+// ── Circular log buffer — last 150 lines from worker stdout/stderr ────────────
+const INTERCOM_LOG_MAX = 150;
+const intercomLogs: string[] = [];
+function pushIntercomLog(line: string) {
+  const ts = new Date().toISOString().slice(11, 23); // HH:MM:SS.mmm
+  intercomLogs.push(`[${ts}] ${line}`);
+  if (intercomLogs.length > INTERCOM_LOG_MAX) intercomLogs.shift();
+}
+
 function startIntercomWorker(): void {
+  intercomLogs.length = 0; // clear on each (re)start
   const workerPath = path.join(__dirname, 'intercom-worker.js');
   const worker = utilityProcess.fork(workerPath, [], {
     stdio: 'pipe',
     cwd: path.join(app.getAppPath(), '..'), // ensures node_modules is resolvable
-    env: { ...process.env, TALECOM_AUTO_ACCEPT: process.env.TALECOM_AUTO_ACCEPT },
+    env: { ...process.env, TAILCOM_AUTO_ACCEPT: process.env.TAILCOM_AUTO_ACCEPT },
   });
   worker.stdout?.on('data', (d: Buffer) => {
-    const msg = d.toString().trimEnd();
-    console.log('[intercom]', msg);
-    if (msg.includes('listening on port')) intercomReady = true;
-    if (msg.includes('incoming-call')) mainWindow?.webContents.send('intercom:incoming-call');
-    if (msg.includes('call started'))  mainWindow?.webContents.send('intercom:call-started');
-    if (msg.includes('call ended'))    mainWindow?.webContents.send('intercom:call-ended');
+    const lines = d.toString().trimEnd().split('\n');
+    for (const line of lines) {
+      const msg = line.trimEnd();
+      if (!msg) continue;
+      console.log('[intercom]', msg);
+      pushIntercomLog(msg);
+      if (msg.includes('listening on port')) intercomReady = true;
+      if (msg.includes('incoming-call')) mainWindow?.webContents.send('intercom:incoming-call');
+      if (msg.includes('call started'))  mainWindow?.webContents.send('intercom:call-started');
+      if (msg.includes('call ended'))    mainWindow?.webContents.send('intercom:call-ended');
+    }
   });
-  worker.stderr?.on('data', (d: Buffer) =>
-    console.error('[intercom]', d.toString().trimEnd()));
+  worker.stderr?.on('data', (d: Buffer) => {
+    const lines = d.toString().trimEnd().split('\n');
+    for (const line of lines) {
+      const msg = line.trimEnd();
+      if (!msg) continue;
+      console.error('[intercom]', msg);
+      pushIntercomLog('ERR ' + msg);
+    }
+  });
+  worker.on('message', (msg: any) => {
+    if (msg?.type === 'audio-level') {
+      mainWindow?.webContents.send('intercom:audio-level', { channel: msg.channel, rms: msg.rms });
+    }
+  });
+
   worker.on('exit', (code: number) => {
-    console.log(`🎙️ Intercom worker exited (code ${code})`);
+    const msg = `🎙️ Intercom worker exited (code ${code})`;
+    console.log(msg);
+    pushIntercomLog(msg);
     intercomWorker = null;
     intercomReady = false;
   });
   intercomWorker = worker;
-  console.log('🎙️ Talecom intercom worker started');
+  pushIntercomLog('🎙️ Tailcom intercom worker started');
+  console.log('🎙️ Tailcom intercom worker started');
 }
 
 function stopIntercomWorker(): void {
@@ -97,9 +128,9 @@ function createWindow() {
   // Read config BEFORE creating the window so the preload inherits the env var
   const appConfig = readAppConfig();
   process.env.TMBILL_ENABLED = appConfig.tmbill_enabled ? 'true' : 'false';
-  process.env.TALECOM_ENABLED = appConfig.talecom_enabled ? 'true' : 'false';
-  process.env.TALECOM_AUTO_ACCEPT = appConfig.talecom_auto_accept ? 'true' : 'false';
-  console.log('🔧 App config loaded — TMBILL:', appConfig.tmbill_enabled ? 'ENABLED' : 'DISABLED', '| TALECOM:', appConfig.talecom_enabled ? 'ENABLED' : 'DISABLED', '| AUTO_ACCEPT:', appConfig.talecom_auto_accept ? 'YES' : 'NO');
+  process.env.TAILCOM_ENABLED = appConfig.tailcom_enabled ? 'true' : 'false';
+  process.env.TAILCOM_AUTO_ACCEPT = appConfig.tailcom_auto_accept ? 'true' : 'false';
+  console.log('🔧 App config loaded — TMBILL:', appConfig.tmbill_enabled ? 'ENABLED' : 'DISABLED', '| TALECOM:', appConfig.tailcom_enabled ? 'ENABLED' : 'DISABLED', '| AUTO_ACCEPT:', appConfig.tailcom_auto_accept ? 'YES' : 'NO');
 
   mainWindow = new BrowserWindow({
     width: 1920,
@@ -316,11 +347,11 @@ app.whenReady().then(() => {
   createWindow();
   setupMaximizeListeners();
 
-  // Start intercom worker only when talecom is enabled in config
-  if (process.env.TALECOM_ENABLED === 'true') {
+  // Start intercom worker only when tailcom is enabled in config
+  if (process.env.TAILCOM_ENABLED === 'true') {
     startIntercomWorker();
   } else {
-    console.log('🎙️ Talecom disabled — intercom worker not started');
+    console.log('🎙️ Tailcom disabled — intercom worker not started');
   }
 
   app.on('activate', () => {
@@ -439,11 +470,13 @@ ipcMain.handle('get-app-version', () => {
 
 // INTERCOM IPC HANDLERS
 ipcMain.handle('intercom:get-status', () => ({
-  enabled: process.env.TALECOM_ENABLED === 'true',
+  enabled: process.env.TAILCOM_ENABLED === 'true',
   running: intercomWorker !== null,
   ready: intercomReady,
   port: 7655,
 }));
+
+ipcMain.handle('intercom:get-logs', () => [...intercomLogs]);
 
 ipcMain.handle('intercom:accept-call', () => {
   intercomWorker?.postMessage({ type: 'accept' });
@@ -458,11 +491,11 @@ ipcMain.handle('config:get', () => {
   return readAppConfig();
 });
 
-ipcMain.handle('config:set', (_event, patch: Partial<{ tmbill_enabled: boolean; talecom_enabled: boolean; talecom_auto_accept: boolean }>) => {
+ipcMain.handle('config:set', (_event, patch: Partial<{ tmbill_enabled: boolean; tailcom_enabled: boolean; tailcom_auto_accept: boolean }>) => {
   const updated = writeAppConfig(patch);
   // Restart the intercom worker immediately if auto-accept setting changed
-  if ('talecom_auto_accept' in patch && process.env.TALECOM_ENABLED === 'true') {
-    process.env.TALECOM_AUTO_ACCEPT = updated.talecom_auto_accept ? 'true' : 'false';
+  if ('tailcom_auto_accept' in patch && process.env.TAILCOM_ENABLED === 'true') {
+    process.env.TAILCOM_AUTO_ACCEPT = updated.tailcom_auto_accept ? 'true' : 'false';
     stopIntercomWorker();
     startIntercomWorker();
   }

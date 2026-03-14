@@ -19,6 +19,7 @@ interface TmbillOrdersState {
   fullyReadyOrderIds: string[];    // orders where kitchen explicitly marked ALL items done
                                    // (via "Mark as Ready" button). Survives TMBILL refreshes.
                                    // Cleared per-order when user unchecks any item.
+  scheduledOverrides: Record<string, string>; // orderId → ISO datetime string (manually set, session-only)
 }
 
 const initialState: TmbillOrdersState = {
@@ -28,6 +29,7 @@ const initialState: TmbillOrdersState = {
   connected: false,
   menu: [],
   fullyReadyOrderIds: [],
+  scheduledOverrides: {},
 };
 
 // ── Shared helper: build isReady preservation map for an order list ───────────
@@ -192,6 +194,18 @@ const tmbillOrdersSlice = createSlice({
       }
     },
 
+    // ── Manual scheduled time override (session-only, not persisted) ─────────
+    setTmbillScheduledOverride: (
+      state,
+      action: PayloadAction<{ orderId: string; isoTime: string | null }>
+    ) => {
+      if (action.payload.isoTime === null) {
+        delete state.scheduledOverrides[action.payload.orderId];
+      } else {
+        state.scheduledOverrides[action.payload.orderId] = action.payload.isoTime;
+      }
+    },
+
     // ── Item ready toggle (local UI only — IPC call handled separately) ───────
     toggleTmbillItemReady: (
       state,
@@ -247,6 +261,7 @@ export const {
   bumpTmbillOrder,
   recallTmbillOrder,
   toggleTmbillItemReady,
+  setTmbillScheduledOverride,
 } = tmbillOrdersSlice.actions;
 
 // ── Selectors ────────────────────────────────────────────────────────────────

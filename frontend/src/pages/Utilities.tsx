@@ -7,9 +7,9 @@ import { useAppSelector } from '../store/hooks';
 import ItemMapping from './utilities/ItemMapping';
 import KdsDebugPanel from './utilities/KdsDebugPanel';
 import TMBillDebugPanel from '../features/tmbill/components/TmbillDebugPanel';
-import TalecomPanel from './utilities/TalecomPanel';
+import TailcomPanel from './utilities/TailcomPanel';
 
-type Tab = 'item-mapping' | 'kds-debug' | 'tmbill-debug' | 'talecom';
+type Tab = 'item-mapping' | 'kds-debug' | 'tmbill-debug' | 'tailcom';
 
 interface TabDef {
   id: Tab;
@@ -41,11 +41,11 @@ const ALL_TABS: TabDef[] = [
     visible: () => !!window.tmbill,
   },
   {
-    id: 'talecom',
-    label: 'Talecom',
+    id: 'tailcom',
+    label: 'Tailcom',
     description: 'Intercom voice call status and settings — monitor the worker and configure call behaviour',
     icon: Phone,
-    visible: () => !!window.electron?.talecomEnabled,
+    visible: () => !!window.electron?.tailcomEnabled,
   },
 ];
 
@@ -56,7 +56,7 @@ export default function Utilities() {
   // Tabs visible in current mode
   const tabs = ALL_TABS.filter(t => {
     if (t.id === 'item-mapping') return true;
-    if (t.id === 'talecom') return t.visible ? t.visible() : false;
+    if (t.id === 'tailcom') return t.visible ? t.visible() : false;
     if (!debugMode) return false;
     return t.visible ? t.visible() : true;
   });
@@ -108,7 +108,7 @@ export default function Utilities() {
         {resolvedTab === 'item-mapping' && <ItemMapping />}
         {resolvedTab === 'kds-debug'    && <KdsDebugPanel />}
         {resolvedTab === 'tmbill-debug' && <TMBillDebugPanel />}
-        {resolvedTab === 'talecom'      && <TalecomPanel />}
+        {resolvedTab === 'tailcom'      && <TailcomPanel />}
       </div>
     </div>
   );

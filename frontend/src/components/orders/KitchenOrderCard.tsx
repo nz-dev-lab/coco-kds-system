@@ -16,10 +16,11 @@
 //   - Special notes (KOT note / order note)
 //   - Item list — large, high-contrast, quantity-first
 
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   Bike,
+  Clock,
   ClipboardList,
   CookingPot,
   ShoppingBag,
@@ -27,9 +28,10 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { markOrderAsViewed } from '../../store/slices/ordersSlice';
+import { clearFlashOrder } from '../../store/slices/uiSlice';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import CocoEatsIcon from '../icons/CocoEatsIcon';
+import { detectScheduledTime, getTmbillScheduleInfo, formatTmbillCountdown } from '../../utils/scheduledTmbillUtils';
 
 interface KitchenOrderCardProps {
   order: any;
@@ -58,7 +60,7 @@ function KitchenOrderCard({ order }: KitchenOrderCardProps) {
 
   const itemNameFontSize  = useAppSelector((s) => s.ui.settings.display.itemNameFontSize  ?? 'sm');
   const itemNameUppercase = useAppSelector((s) => s.ui.settings.display.itemNameUppercase ?? false);
-  const isNewOrder        = useAppSelector((s) => s.orders.newOrderIds.includes(order.id));
+  const isNewOrder        = useAppSelector((s) => s.ui.flashOrderIds?.includes(String(order.id)) ?? false);
   const [showAnimation, setShowAnimation] = useState(isNewOrder);
 
   // ── Normalise order fields across both CocoEats and TMBILL shapes ────────────
@@ -80,8 +82,19 @@ function KitchenOrderCard({ order }: KitchenOrderCardProps) {
   const formatAge = (m: number) =>
     m < 60 ? `${m}min` : `${Math.floor(m / 60)}h ${m % 60}m`;
 
-  // ── Age border colour (same thresholds as OrderCard) ─────────────────────────
+  // ── Scheduled time detection (TMBILL orders only, auto-detect from notes) ────
+  const alertMinutes = useAppSelector((s) => s.ui.settings.tmbillNotifications?.scheduledAlertMinutes ?? 30);
+  const scheduleInfo = useMemo(() => {
+    if (!isTmbill) return null;
+    const detected = detectScheduledTime(order, currentTime);
+    if (!detected) return null;
+    return getTmbillScheduleInfo(detected.scheduledTime, detected.confidence, alertMinutes, currentTime);
+  }, [isTmbill, order, alertMinutes, currentTime]);
+
+  // ── Age border — amber/red override when scheduled TMBILL order is approaching/overdue
   const ageBorder =
+    scheduleInfo?.isOverdue    ? 'border-l-red-600' :
+    scheduleInfo?.isApproaching ? 'border-l-purple-500' :
     orderAge < 15 ? 'border-l-green-500' :
     orderAge < 30 ? 'border-l-yellow-500' :
                     'border-l-red-500';
@@ -99,12 +112,17 @@ function KitchenOrderCard({ order }: KitchenOrderCardProps) {
   };
   const typeDisplay = orderTypeDisplay[orderType] ?? { label: orderType, icon: <CookingPot className="w-4 h-4" /> };
 
+  // ── Sync showAnimation when flash is dispatched after mount ─────────────────
+  useEffect(() => {
+    if (isNewOrder) setShowAnimation(true);
+  }, [isNewOrder]);
+
   // ── Auto-dismiss new-order animation after 60 s ───────────────────────────────
   useEffect(() => {
     if (!isNewOrder || !showAnimation) return;
     const t = setTimeout(() => {
       setShowAnimation(false);
-      dispatch(markOrderAsViewed(order.id));
+      dispatch(clearFlashOrder(String(order.id)));
     }, 60_000);
     return () => clearTimeout(t);
   }, [isNewOrder, showAnimation, order.id, dispatch]);
@@ -128,7 +146,7 @@ function KitchenOrderCard({ order }: KitchenOrderCardProps) {
       shadow-md
       flex flex-col
       min-w-[240px] max-w-[550px] w-full
-      ${showAnimation ? 'new-order-animation' : ''}
+      ${showAnimation ? 'new-order-animation-kitchen' : ''}
     `}>
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
@@ -150,6 +168,28 @@ function KitchenOrderCard({ order }: KitchenOrderCardProps) {
           </span>
         </div>
       </div>
+
+      {/* ── Scheduled badge strip (TMBILL only) ─────────────────────────────── */}
+      {scheduleInfo?.detected && (
+        <div className={`px-3 py-1.5 flex items-center gap-1.5 text-xs font-semibold ${
+          scheduleInfo.isOverdue
+            ? 'bg-red-100 text-red-700'
+            : scheduleInfo.isApproaching
+            ? 'bg-purple-100 text-purple-800'
+            : 'bg-purple-50 text-purple-700'
+        }`}>
+          <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>
+            {scheduleInfo.isOverdue
+              ? `Overdue by ${formatTmbillCountdown(scheduleInfo.minutesUntil ?? 0)}`
+              : `Scheduled ${scheduleInfo.scheduledTimeFormatted} — in ${formatTmbillCountdown(scheduleInfo.minutesUntil ?? 0)}`
+            }
+          </span>
+          {scheduleInfo.confidence === 'medium' && (
+            <span className="opacity-60 text-[10px]">(inferred)</span>
+          )}
+        </div>
+      )}
 
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div className="p-4 flex flex-col gap-3">

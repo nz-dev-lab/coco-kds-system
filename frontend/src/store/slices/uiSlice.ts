@@ -9,6 +9,10 @@ interface UIState {
   selectedStation: string;
   selectedSource: 'all' | 'cocoeats' | 'tmbill';
   theme: 'dark' | 'light';
+  // Transient — order IDs currently showing the new-order animation.
+  // Not persisted. Populated by detection points (App.tsx, useTmbillOrders).
+  // Cleared by each card after 60 s or on user interaction.
+  flashOrderIds: string[];
   settings: {
     stationView: StationView;
     // IP of the KDS host PC (packing screen). Set on kitchen PCs to receive orders via WebSocket.
@@ -19,11 +23,15 @@ interface UIState {
       voiceEnabled: boolean;
       soundEffectsVolume: number; // 0-100
       voiceVolume: number; // 0-100
+      // How many times to repeat the notification sound on client/kitchen screens.
+      // Host screen always plays once — only kitchen screens pass this to the audio service.
+      notificationRepeatCount: number; // 1-5
     };
     tmbillNotifications: {
       enabled: boolean;
       customSoundPath: string | null; // absolute path to user-chosen audio file; null = default beep
       volume: number; // 0-100
+      scheduledAlertMinutes: number; // minutes before scheduled time to fire alert
     };
     display: {
       showOrderAge: boolean;
@@ -51,8 +59,8 @@ interface UIState {
 // ============================================
 // ✅ STEP 1: INCREMENT THIS WHEN ADDING NEW SETTINGS
 // ============================================
-// Current version: 8 (added 'tmbillNotifications' block)
-const SETTINGS_VERSION = 8;
+// Current version: 10 (added scheduledAlertMinutes to tmbillNotifications)
+const SETTINGS_VERSION = 10;
 
 // ============================================
 // ✅ STEP 2: ADD NEW FIELDS HERE
@@ -65,6 +73,7 @@ const getDefaultSettings = (): UIState['settings'] => ({
     voiceEnabled: true,
     soundEffectsVolume: 70,
     voiceVolume: 90,
+    notificationRepeatCount: 3,
   },
   display: {
     showOrderAge: true,
@@ -81,6 +90,7 @@ const getDefaultSettings = (): UIState['settings'] => ({
     enabled: true,
     customSoundPath: null,
     volume: 80,
+    scheduledAlertMinutes: 30,
   },
   printer: {
     selectedPrinterName: null,
@@ -163,6 +173,24 @@ const migrateSettings = (oldSettings: any, oldVersion: number): UIState['setting
     };
   }
 
+  // Migration v8 → v9: Added notificationRepeatCount to audioNotifications
+  if (oldVersion < 9) {
+    console.log('📦 Migrating settings v8 → v9: Adding notificationRepeatCount');
+    settings.audioNotifications = {
+      ...settings.audioNotifications,
+      notificationRepeatCount: 3,
+    };
+  }
+
+  // Migration v9 → v10: Added scheduledAlertMinutes to tmbillNotifications
+  if (oldVersion < 10) {
+    console.log('📦 Migrating settings v9 → v10: Adding scheduledAlertMinutes');
+    settings.tmbillNotifications = {
+      ...settings.tmbillNotifications,
+      scheduledAlertMinutes: 30,
+    };
+  }
+
   return settings as UIState['settings'];
 };
 
@@ -212,6 +240,7 @@ const initialState: UIState = {
   selectedStation: 'Main Kitchen',
   selectedSource: 'all',
   theme: 'dark',
+  flashOrderIds: [],
   settings: loadSettings(),
   focusedOrderId: null,
   focusedOrderPosition: null,
@@ -283,6 +312,21 @@ const uiSlice = createSlice({
     },
 
     // ========================================
+    // Flash Order IDs (transient — not persisted)
+    // Marks orders as "new" for the animation. Populated by detection points
+    // (App.tsx for kitchen screen, useTmbillOrders for TMBILL on host).
+    // Cleared by each card component after 60 s or on user interaction.
+    // ========================================
+    addFlashOrder: (state, action: PayloadAction<string>) => {
+      if (!state.flashOrderIds.includes(action.payload)) {
+        state.flashOrderIds.push(action.payload);
+      }
+    },
+    clearFlashOrder: (state, action: PayloadAction<string>) => {
+      state.flashOrderIds = state.flashOrderIds.filter((id) => id !== action.payload);
+    },
+
+    // ========================================
     // Audio Settings (saves to localStorage)
     // ========================================
     toggleAudioNotifications: (state) => {
@@ -299,6 +343,10 @@ const uiSlice = createSlice({
     },
     setVoiceVolume: (state, action: PayloadAction<number>) => {
       state.settings.audioNotifications.voiceVolume = action.payload;
+      saveSettings(state.settings);
+    },
+    setNotificationRepeatCount: (state, action: PayloadAction<number>) => {
+      state.settings.audioNotifications.notificationRepeatCount = action.payload;
       saveSettings(state.settings);
     },
 
@@ -403,6 +451,10 @@ const uiSlice = createSlice({
       state.settings.tmbillNotifications.customSoundPath = action.payload;
       saveSettings(state.settings);
     },
+    setTmbillScheduledAlertMinutes: (state, action: PayloadAction<number>) => {
+      state.settings.tmbillNotifications.scheduledAlertMinutes = action.payload;
+      saveSettings(state.settings);
+    },
 
     // ========================================
     // Debug Mode (saves to localStorage)
@@ -439,11 +491,14 @@ export const {
   addRecentlyUpdated,
   removeRecentlyUpdated,
   clearRecentlyUpdated,
+  addFlashOrder,
+  clearFlashOrder,
   setStationView,
   toggleAudioNotifications,
   toggleVoiceNotifications,
   setSoundEffectsVolume,
   setVoiceVolume,
+  setNotificationRepeatCount,
   toggleShowOrderAge,
   toggleAutoRefresh,
   toggleRequireDoubleTap,
@@ -459,6 +514,7 @@ export const {
   toggleTmbillNotifications,
   setTmbillNotificationVolume,
   setTmbillCustomSoundPath,
+  setTmbillScheduledAlertMinutes,
   resetSettings,
 } = uiSlice.actions;
 

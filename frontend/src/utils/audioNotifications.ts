@@ -129,6 +129,19 @@ class AudioNotificationService {
     return store.getState().ui.settings.audioNotifications.voiceEnabled;
   }
 
+  // Play a sound N times, chaining via onended. Calls onAllDone after the last play.
+  private playRepeated(sound: HTMLAudioElement, times: number, onAllDone?: () => void) {
+    let remaining = Math.max(1, times);
+    const playNext = () => {
+      if (remaining <= 0) { onAllDone?.(); return; }
+      remaining--;
+      sound.currentTime = 0;
+      sound.onended = playNext;
+      sound.play().catch((e) => console.error('Audio play error:', e));
+    };
+    playNext();
+  }
+
   async playReadyNotification(orderId: string) {
     // Check if notifications are disabled
     if (!this.isEnabled()) {
@@ -196,36 +209,20 @@ class AudioNotificationService {
     }
   }
 
-  // ✅ ADD THIS - New order notification
-  async playNewOrderNotification() {
-    // Check if notifications are disabled
+  // New order notification. repeat=1 on host (default), >1 on kitchen screens.
+  playNewOrderNotification(repeat = 1) {
     if (!this.isEnabled()) {
       console.log('🔇 Audio notifications disabled');
       return;
     }
-
-    console.log('🔔 Playing NEW ORDER notification');
-
-    // Update volumes before playing
+    console.log(`🔔 Playing NEW ORDER notification (×${repeat})`);
     this.updateVolumes();
-
-    try {
-      // Step 1: Play new order sound
-      this.newOrderSound.currentTime = 0;
-      await this.newOrderSound.play();
-
-      // Step 2: Wait for sound to finish, then play voice (if enabled)
-      this.newOrderSound.onended = () => {
-        if (this.isVoiceEnabled()) {
-          this.newOrderVoice.currentTime = 0;
-          this.newOrderVoice.play().catch(e => console.error('Voice play error:', e));
-        } else {
-          console.log('🔇 Voice notifications disabled');
-        }
-      };
-    } catch (error) {
-      console.error('❌ Audio play error:', error);
-    }
+    this.playRepeated(this.newOrderSound, repeat, () => {
+      if (this.isVoiceEnabled()) {
+        this.newOrderVoice.currentTime = 0;
+        this.newOrderVoice.play().catch((e) => console.error('Voice play error:', e));
+      }
+    });
   }
 
   // Test sounds (used in settings page)
@@ -267,10 +264,10 @@ class AudioNotificationService {
     await this.newOrderVoice.play();
   }
 
-  // TMBILL new order notification
-  async playTmbillNotification() {
+  // TMBILL new order notification. repeat=1 on host (default), >1 on kitchen screens.
+  playTmbillNotification(repeat = 1) {
     const tmbillSettings = store.getState().ui.settings.tmbillNotifications;
-    kdsLog(`[Audio] playTmbillNotification called — enabled=${tmbillSettings?.enabled ?? false}, volume=${tmbillSettings?.volume ?? 80}`, 'host');
+    kdsLog(`[Audio] playTmbillNotification called — enabled=${tmbillSettings?.enabled ?? false}, volume=${tmbillSettings?.volume ?? 80}, repeat=${repeat}`, 'host');
     if (!tmbillSettings?.enabled) {
       console.log('🔇 TMBILL notifications disabled');
       kdsLog('[Audio] TMBILL notification blocked — disabled in settings', 'host', 'warn');
@@ -278,18 +275,12 @@ class AudioNotificationService {
     }
 
     const src = this.tmbillSound.src || '(empty)';
-    console.log('🔔 Playing TMBILL new order notification');
+    console.log(`🔔 Playing TMBILL new order notification (×${repeat})`);
     kdsLog(`[Audio] playing TMBILL sound — src: ${src}`, 'host');
     this.updateVolumes();
-
-    try {
-      this.tmbillSound.currentTime = 0;
-      await this.tmbillSound.play();
-      kdsLog('[Audio] TMBILL sound played ✓', 'host');
-    } catch (error) {
-      console.error('❌ TMBILL audio play error:', error);
-      kdsLog(`[Audio] TMBILL sound play error: ${error}`, 'host', 'error');
-    }
+    this.playRepeated(this.tmbillSound, repeat, () => {
+      kdsLog('[Audio] TMBILL sound sequence complete ✓', 'host');
+    });
   }
 
   async testTmbillSound() {

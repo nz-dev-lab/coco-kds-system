@@ -13,14 +13,14 @@ import fs from 'fs';
 
 export interface AppConfig {
   tmbill_enabled: boolean;
-  talecom_enabled: boolean;
-  talecom_auto_accept: boolean;
+  tailcom_enabled: boolean;
+  tailcom_auto_accept: boolean;
 }
 
 const DEFAULTS: AppConfig = {
   tmbill_enabled: true,
-  talecom_enabled: true,
-  talecom_auto_accept: true,
+  tailcom_enabled: true,
+  tailcom_auto_accept: true,
 };
 
 const CONFIG_PATH = path.join(app.getPath('userData'), 'config.json');
@@ -34,8 +34,12 @@ export function readAppConfig(): AppConfig {
       return DEFAULTS;
     }
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    // Migrate old talecom_ keys to tailcom_ (backwards compat for existing installs)
+    if ('talecom_enabled'     in parsed && !('tailcom_enabled'     in parsed)) parsed.tailcom_enabled     = parsed.talecom_enabled;
+    if ('talecom_auto_accept' in parsed && !('tailcom_auto_accept' in parsed)) parsed.tailcom_auto_accept = parsed.talecom_auto_accept;
     // Spread DEFAULTS first so any new keys added in future versions are filled in
-    return { ...DEFAULTS, ...JSON.parse(raw) };
+    return { ...DEFAULTS, ...parsed };
   } catch (err) {
     console.warn('⚠️ Failed to read config, using defaults:', err);
     return DEFAULTS;

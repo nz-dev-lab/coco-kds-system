@@ -25,11 +25,12 @@ contextBridge.exposeInMainWorld('electron', {
 
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   platform: process.platform,
-  talecomEnabled: process.env.TALECOM_ENABLED === 'true',
+  tailcomEnabled: process.env.TAILCOM_ENABLED === 'true',
 
-  // Intercom (Talecom) status + call control
+  // Intercom (Tailcom) status + call control
   intercom: {
     getStatus:     () => ipcRenderer.invoke('intercom:get-status'),
+    getLogs:       () => ipcRenderer.invoke('intercom:get-logs'),
     acceptCall:    () => ipcRenderer.invoke('intercom:accept-call'),
     rejectCall:    () => ipcRenderer.invoke('intercom:reject-call'),
     onIncomingCall: (cb: () => void) => { ipcRenderer.on('intercom:incoming-call', cb); },
@@ -38,6 +39,11 @@ contextBridge.exposeInMainWorld('electron', {
     offIncomingCall: (cb: () => void) => { ipcRenderer.removeListener('intercom:incoming-call', cb); },
     offCallStarted:  (cb: () => void) => { ipcRenderer.removeListener('intercom:call-started', cb); },
     offCallEnded:    (cb: () => void) => { ipcRenderer.removeListener('intercom:call-ended', cb); },
+    onAudioLevel: (cb: (data: { channel: 'local' | 'remote'; rms: number }) => void) => {
+      const sub = (_event: any, data: any) => cb(data);
+      ipcRenderer.on('intercom:audio-level', sub);
+      return () => ipcRenderer.removeListener('intercom:audio-level', sub);
+    },
   },
 
   // Auto-updater
@@ -74,7 +80,7 @@ contextBridge.exposeInMainWorld('electron', {
   // App config
   config: {
     get: () => ipcRenderer.invoke('config:get'),
-    set: (patch: { tmbill_enabled?: boolean; talecom_enabled?: boolean; talecom_auto_accept?: boolean }) => ipcRenderer.invoke('config:set', patch),
+    set: (patch: { tmbill_enabled?: boolean; tailcom_enabled?: boolean; tailcom_auto_accept?: boolean }) => ipcRenderer.invoke('config:set', patch),
   },
 
   // Item mapping API
