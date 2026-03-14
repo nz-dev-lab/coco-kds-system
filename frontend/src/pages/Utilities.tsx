@@ -104,7 +104,7 @@ export default function Utilities() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
         {resolvedTab === 'item-mapping' && <ItemMapping />}
         {resolvedTab === 'kds-debug'    && <KdsDebugPanel />}
         {resolvedTab === 'tmbill-debug' && <TMBillDebugPanel />}
