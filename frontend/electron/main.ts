@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import fs from 'fs';
-import { exec, spawn, ChildProcess } from 'child_process';
+import { exec, execSync, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 const execAsync = promisify(exec);
 import { autoUpdater } from 'electron-updater';
@@ -46,21 +46,37 @@ function pushIntercomLog(line: string) {
   if (intercomLogs.length > INTERCOM_LOG_MAX) intercomLogs.shift();
 }
 
+function getWorkerBinary(): string {
+  // On Windows, Electron binary has Chromium DLLs that conflict with @roamhq/wrtc ICE.
+  // Use system node.exe if available — it has no such conflicts.
+  if (process.platform === 'win32') {
+    try {
+      const nodePath = execSync('where node.exe', { timeout: 3000 })
+        .toString().trim().split('\n')[0].trim();
+      if (nodePath && !nodePath.toLowerCase().includes('cocoflow')) {
+        pushIntercomLog(`[intercom] using system Node.js: ${nodePath}`);
+        return nodePath;
+      }
+    } catch { /* node.exe not in PATH */ }
+    pushIntercomLog('[intercom] system node.exe not found — falling back to Electron binary');
+  }
+  return process.execPath;
+}
+
 function startIntercomWorker(): void {
   intercomLogs.length = 0; // clear on each (re)start
   const workerPath = path.join(__dirname, 'intercom-worker.js');
-  // In packaged app the worker must come from app.asar.unpacked (not inside asar)
-  // so the OS can load it as a plain Node.js script with full Win32 network access.
+  // In packaged app the worker must come from app.asar.unpacked so the OS can load it.
   const unpackedWorkerPath = workerPath.includes('app.asar')
     ? workerPath.replace('app.asar', 'app.asar.unpacked')
     : workerPath;
-  const worker = spawn(process.execPath, [unpackedWorkerPath], {
+  const workerBinary = getWorkerBinary();
+  const worker = spawn(workerBinary, [unpackedWorkerPath], {
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     cwd: path.join(app.getAppPath(), '..'),
     env: {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
-      // Point NODE_PATH to asar node_modules so worker can resolve tailcom-client etc.
       NODE_PATH: path.join(app.getAppPath(), 'node_modules'),
       TAILCOM_AUTO_ACCEPT: process.env.TAILCOM_AUTO_ACCEPT,
     },
@@ -99,6 +115,12 @@ function startIntercomWorker(): void {
     pushIntercomLog(msg);
     intercomWorker = null;
     intercomReady = false;
+    if (process.env.TAILCOM_ENABLED === 'true') {
+      pushIntercomLog('🎙️ Restarting intercom worker in 5s...');
+      setTimeout(() => {
+        if (process.env.TAILCOM_ENABLED === 'true' && !intercomWorker) startIntercomWorker();
+      }, 5000);
+    }
   });
   intercomWorker = worker;
   pushIntercomLog('🎙️ Tailcom intercom worker started');
