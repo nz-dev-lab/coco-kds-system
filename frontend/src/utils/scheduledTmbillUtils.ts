@@ -44,22 +44,30 @@ interface ParsedTime {
 function parseTimeFromText(text: string): ParsedTime | null {
   if (!text) return null;
   TIME_PATTERN.lastIndex = 0;
-  const match = TIME_PATTERN.exec(text);
-  if (!match) return null;
 
-  const hour = parseInt(match[1], 10);
-  const minute = match[2] ? parseInt(match[2], 10) : 0;
-  const ampmStr = match[3]?.toLowerCase() as 'am' | 'pm' | undefined;
-  const hasMinutes = !!match[2];
+  // Loop through all matches — skip any that look like order reference numbers
+  // e.g. "TA 19", "TB 20", "TBL 5" where letters immediately precede the number
+  let match: RegExpExecArray | null;
+  while ((match = TIME_PATTERN.exec(text)) !== null) {
+    // If the digit is preceded by letters (with optional whitespace), it's an order ref — skip
+    if (match.index > 0 && /[A-Za-z]\s*$/.test(text.slice(0, match.index))) continue;
 
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    const hour = parseInt(match[1], 10);
+    const minute = match[2] ? parseInt(match[2], 10) : 0;
+    const ampmStr = match[3]?.toLowerCase() as 'am' | 'pm' | undefined;
+    const hasMinutes = !!match[2];
 
-  // Reject bare numbers entirely (no colon separator AND no AM/PM).
-  // These are almost always table/person counts, not times.
-  // Only 24h numbers (13–23) are unambiguous without a separator.
-  if (!hasMinutes && !ampmStr && hour < 13) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) continue;
 
-  return { hour, minute, hasMinutes, hasAmPm: !!ampmStr, ampm: ampmStr };
+    // Reject bare numbers entirely (no colon separator AND no AM/PM).
+    // These are almost always table/person counts, not times.
+    // Only 24h numbers (13–23) are unambiguous without a separator.
+    if (!hasMinutes && !ampmStr && hour < 13) continue;
+
+    return { hour, minute, hasMinutes, hasAmPm: !!ampmStr, ampm: ampmStr };
+  }
+
+  return null;
 }
 
 /**
