@@ -66,11 +66,16 @@ export interface ElectronAPI {
     set: (patch: Partial<AppConfig>) => Promise<AppConfig>;
   };
   autoUpdater: {
+    onCheckingForUpdate: (callback: () => void) => void;
     onUpdateAvailable: (callback: (info: any) => void) => void;
+    onUpdateNotAvailable: (callback: (info: any) => void) => void;
     onUpdateProgress: (callback: (progress: any) => void) => void;
     onUpdateDownloaded: (callback: (info: any) => void) => void;
+    onUpdateError: (callback: (error: string) => void) => void;
     downloadUpdate: () => void;
     installUpdate: () => void;
+    checkForUpdates: () => Promise<void>;
+    getAppVersion: () => Promise<string>;
   };
   database: {
     addCompletedOrder: (order: any) => Promise<{ success: boolean; error?: string }>;

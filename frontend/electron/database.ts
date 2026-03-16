@@ -56,6 +56,33 @@ const dbPath = getSharedDBPath();
 
 console.log('📁 Database location:', dbPath);
 
+// ── Auto-backup on startup ────────────────────────────────────────────────────
+// Keeps the last 3 timestamped backups. Safe against accidental uninstall/corruption
+// because the DB lives in C:\ProgramData\CocoKDS (outside the install directory).
+function backupDatabase(sourcePath: string): void {
+  if (!fs.existsSync(sourcePath)) return; // nothing to back up on first run
+  const backupDir = path.dirname(sourcePath);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const backupPath = path.join(backupDir, `kds-data.backup-${timestamp}.db`);
+  try {
+    fs.copyFileSync(sourcePath, backupPath);
+    console.log('✅ Database backed up to:', backupPath);
+    // Prune — keep only the 3 most recent backups
+    const backups = fs.readdirSync(backupDir)
+      .filter(f => f.startsWith('kds-data.backup-') && f.endsWith('.db'))
+      .sort()
+      .reverse();
+    backups.slice(3).forEach(old => {
+      try { fs.unlinkSync(path.join(backupDir, old)); } catch {}
+      console.log('🗑️ Removed old backup:', old);
+    });
+  } catch (err) {
+    console.warn('⚠️ Database backup failed:', err);
+  }
+}
+
+backupDatabase(dbPath);
+
 // Initialize database
 const db = new Database(dbPath, { verbose: console.log });
 

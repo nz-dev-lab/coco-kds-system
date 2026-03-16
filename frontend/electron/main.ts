@@ -330,22 +330,22 @@ function setupMaximizeListeners() {
 function setupAutoUpdater(window: BrowserWindow) {
   autoUpdater.on('checking-for-update', () => {
     console.log('🔍 Checking for updates...');
+    window.webContents.send('update_checking');
   });
 
   autoUpdater.on('update-available', (info) => {
     console.log('✅ Update available:', info.version);
-    // Send to renderer - let user decide
     window.webContents.send('update_available', {
       version: info.version,
       releaseNotes: info.releaseNotes,
       releaseDate: info.releaseDate,
     });
-    // ⭐ DON'T auto-download - wait for user to click "Download Now"
     console.log('⏳ Waiting for user action...');
   });
 
   autoUpdater.on('update-not-available', (info) => {
     console.log('✓ App is up to date:', info.version);
+    window.webContents.send('update_not_available', { version: info.version });
   });
 
   autoUpdater.on('error', (error) => {
@@ -514,6 +514,9 @@ ipcMain.handle('intercom:get-status', () => ({
 }));
 
 ipcMain.handle('intercom:get-logs', () => [...intercomLogs]);
+
+ipcMain.handle('app:get-version', () => app.getVersion());
+ipcMain.handle('autoUpdater:check-now', () => { autoUpdater.checkForUpdates(); });
 
 ipcMain.handle('intercom:accept-call', () => {
   intercomWorker?.send({ type: 'accept' });

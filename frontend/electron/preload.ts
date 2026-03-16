@@ -48,8 +48,14 @@ contextBridge.exposeInMainWorld('electron', {
 
   // Auto-updater
   autoUpdater: {
+    onCheckingForUpdate: (callback: () => void) => {
+      ipcRenderer.on('update_checking', () => callback());
+    },
     onUpdateAvailable: (callback: (info: any) => void) => {
       ipcRenderer.on('update_available', (_event, info) => callback(info));
+    },
+    onUpdateNotAvailable: (callback: (info: any) => void) => {
+      ipcRenderer.on('update_not_available', (_event, info) => callback(info));
     },
     onUpdateProgress: (callback: (progress: any) => void) => {
       ipcRenderer.on('update_progress', (_event, progress) => callback(progress));
@@ -57,8 +63,13 @@ contextBridge.exposeInMainWorld('electron', {
     onUpdateDownloaded: (callback: (info: any) => void) => {
       ipcRenderer.on('update_downloaded', (_event, info) => callback(info));
     },
+    onUpdateError: (callback: (error: string) => void) => {
+      ipcRenderer.on('update_error', (_event, error) => callback(error));
+    },
     downloadUpdate: () => ipcRenderer.send('download-update'),
     installUpdate: () => ipcRenderer.send('install-update'),
+    checkForUpdates: () => ipcRenderer.invoke('autoUpdater:check-now'),
+    getAppVersion: () => ipcRenderer.invoke('app:get-version'),
   },
 
   // DATABASE API

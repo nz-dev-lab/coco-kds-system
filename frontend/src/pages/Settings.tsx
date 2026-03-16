@@ -49,6 +49,37 @@ export default function Settings() {
   // ── KDS Client section state (kitchen screens) ────────────────────────────
   const isKdsClient = isElectronApp && settings.stationView !== 'all';
   const [kdsHostIpInput, setKdsHostIpInput] = useState<string>(settings.kdsHostIp ?? '');
+
+  // ── Update panel state ────────────────────────────────────────────────────
+  type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'ready' | 'error';
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
+  const [updateInfo, setUpdateInfo] = useState<{ version: string; releaseDate?: string } | null>(null);
+  const [downloadPercent, setDownloadPercent] = useState(0);
+  const [appVersion, setAppVersion] = useState<string>('');
+  const [updateError, setUpdateError] = useState<string>('');
+
+  useEffect(() => {
+    if (!window.electron?.autoUpdater) return;
+    window.electron.autoUpdater.getAppVersion().then(setAppVersion).catch(() => {});
+    window.electron.autoUpdater.onCheckingForUpdate(() => setUpdateStatus('checking'));
+    window.electron.autoUpdater.onUpdateAvailable((info) => {
+      setUpdateInfo({ version: info.version, releaseDate: info.releaseDate });
+      setUpdateStatus('available');
+    });
+    window.electron.autoUpdater.onUpdateNotAvailable(() => setUpdateStatus('up-to-date'));
+    window.electron.autoUpdater.onUpdateProgress((p) => {
+      setDownloadPercent(Math.round(p.percent));
+      setUpdateStatus('downloading');
+    });
+    window.electron.autoUpdater.onUpdateDownloaded((info) => {
+      setUpdateInfo((prev) => ({ ...prev, version: info.version }));
+      setUpdateStatus('ready');
+    });
+    window.electron.autoUpdater.onUpdateError((err) => {
+      setUpdateError(err);
+      setUpdateStatus('error');
+    });
+  }, []);
   const [scanning, setScanning] = useState(false);
   // Sync input if saved value changes externally (e.g. clear button)
   useEffect(() => { setKdsHostIpInput(settings.kdsHostIp ?? ''); }, [settings.kdsHostIp]);
@@ -1067,6 +1098,91 @@ export default function Settings() {
           </p>
         )}
       </div>
+
+      {/* App Updates */}
+      {isElectronApp && (
+        <div className="bg-white dark:bg-kds-surface rounded-xl p-5 border border-slate-200 dark:border-kds-border">
+          <h3 className="font-semibold text-slate-800 dark:text-kds-text-primary mb-4">App Updates</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Current version</p>
+              <p className="font-mono text-slate-800 dark:text-kds-text-primary font-medium">v{appVersion || import.meta.env.VITE_APP_VERSION}</p>
+            </div>
+            <button
+              onClick={() => { setUpdateStatus('checking'); window.electron.autoUpdater.checkForUpdates(); }}
+              disabled={updateStatus === 'checking' || updateStatus === 'downloading'}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`w-4 h-4 ${updateStatus === 'checking' ? 'animate-spin' : ''}`} />
+              {updateStatus === 'checking' ? 'Checking...' : 'Check for Updates'}
+            </button>
+          </div>
+
+          {updateStatus === 'up-to-date' && (
+            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-lg px-3 py-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+              You're on the latest version
+            </div>
+          )}
+
+          {updateStatus === 'available' && updateInfo && (
+            <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-semibold text-blue-800 dark:text-blue-300">Update Available — v{updateInfo.version}</p>
+                  {updateInfo.releaseDate && (
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                      Released {new Date(updateInfo.releaseDate).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => { setUpdateStatus('downloading'); window.electron.autoUpdater.downloadUpdate(); }}
+                  className="shrink-0 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Download
+                </button>
+              </div>
+            </div>
+          )}
+
+          {updateStatus === 'downloading' && (
+            <div className="rounded-lg border border-slate-200 dark:border-kds-border bg-slate-50 dark:bg-slate-800/50 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Downloading update...</p>
+                <span className="text-sm font-mono text-slate-600 dark:text-slate-400">{downloadPercent}%</span>
+              </div>
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${downloadPercent}%` }} />
+              </div>
+            </div>
+          )}
+
+          {updateStatus === 'ready' && updateInfo && (
+            <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-semibold text-green-800 dark:text-green-300">v{updateInfo.version} ready to install</p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">The app will restart to apply the update</p>
+                </div>
+                <button
+                  onClick={() => window.electron.autoUpdater.installUpdate()}
+                  className="shrink-0 px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Install & Restart
+                </button>
+              </div>
+            </div>
+          )}
+
+          {updateStatus === 'error' && (
+            <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+              Update check failed: {updateError || 'Unknown error'}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Reset Button */}
       <div className="flex justify-end">
