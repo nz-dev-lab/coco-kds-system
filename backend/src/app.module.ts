@@ -7,6 +7,7 @@ import { RedisModule } from './redis/redis.module';
 import { FoodsModule } from './foods/foods.module';
 import { AppConfigModule } from './config/config.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { DeliveryModule } from './delivery/delivery.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     FoodsModule,
     AppConfigModule,
     NotificationsModule,
+    DeliveryModule,
   ],
 })
 export class AppModule {}
