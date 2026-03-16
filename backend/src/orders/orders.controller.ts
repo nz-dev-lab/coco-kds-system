@@ -96,12 +96,52 @@ export class OrdersController {
     const restaurantId = req.user.restaurantId;
 
     const mockOrder = {
-      id: '999999',
+      id: 999999,
       restaurant_id: restaurantId,
       order_status: 'pending',
       order_type: 'delivery',
-      items: [{ name: 'Test Item', quantity: 1 }],
-      created_at: new Date(),
+      payment_method: 'cash_on_delivery',
+      order_amount: '18.99',
+      delivery_charge: '2.00',
+      total_tax_amount: '0.00',
+      order_note: 'Test order — no onions please',
+      delivery_instruction: null,
+      processing_time: null,
+      delivery_man_id: null,
+      created_at: new Date().toISOString(),
+      schedule_at: null,
+      scheduled: 0,
+      order_age_minutes: 0,
+      delivery_address: JSON.stringify({
+        contact_person_name: 'Test Customer',
+        contact_person_number: '07700900000',
+        address_type: 'home',
+        address: '123 Test Street, Preston, PR1 1AA',
+        latitude: '53.7632',
+        longitude: '-2.7050',
+      }),
+      details: [
+        {
+          id: 1,
+          food_id: 101,
+          food_details: JSON.stringify({ name: 'Chicken Burger' }),
+          quantity: 2,
+          price: '7.99',
+          variant: null,
+          variation: null,
+          add_ons: JSON.stringify([{ name: 'Extra Sauce', quantity: 1, price: '0.50' }]),
+        },
+        {
+          id: 2,
+          food_id: 102,
+          food_details: JSON.stringify({ name: 'Chips (Large)' }),
+          quantity: 1,
+          price: '3.00',
+          variant: 'Large',
+          variation: null,
+          add_ons: '[]',
+        },
+      ],
     };
 
     this.ordersGateway.emitNewOrder(restaurantId, mockOrder);

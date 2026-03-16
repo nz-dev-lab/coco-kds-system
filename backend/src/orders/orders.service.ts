@@ -67,10 +67,35 @@ export class OrdersService {
       },
     });
 
-    // Filter to last 24 hours
-    return orders
-      .filter((order) => new Date(order.created_at) >= twentyFourHoursAgo)
-      .map((order) => this.formatOrder(order));
+    const recentOrders = orders.filter(
+      (order) => new Date(order.created_at) >= twentyFourHoursAgo,
+    );
+
+    // Batch-fetch delivery man names for all assigned orders
+    const dmIds = [
+      ...new Set(recentOrders.map((o) => o.delivery_man_id).filter(Boolean)),
+    ] as number[];
+    const dmNameMap = new Map<number, string>();
+    if (dmIds.length > 0) {
+      const dms = await this.deliveryManRepo.find({
+        where: { id: In(dmIds) },
+        select: ['id', 'f_name', 'l_name'],
+      });
+      dms.forEach((dm) => {
+        const lastName = dm.l_name?.trim();
+        const name = [dm.f_name?.trim(), lastName ? lastName[0] : '']
+          .filter(Boolean)
+          .join(' ');
+        dmNameMap.set(dm.id, name);
+      });
+    }
+
+    return recentOrders.map((order) =>
+      this.formatOrder(
+        order,
+        order.delivery_man_id ? dmNameMap.get(order.delivery_man_id) : null,
+      ),
+    );
   }
 
   async getOrderDetails(orderId: number, restaurantId: number) {
@@ -167,7 +192,7 @@ export class OrdersService {
     }
   }
 
-  private formatOrder(order: Order) {
+  private formatOrder(order: Order, deliveryManName?: string | null) {
     // Parse delivery_address to extract customer info
     let customerName: string | null = null;
     let parsedDeliveryAddress: DeliveryAddress | null = null;
@@ -201,6 +226,7 @@ export class OrdersService {
       order_note: order.order_note,
       delivery_instruction: order.delivery_instruction,
       delivery_man_id: order.delivery_man_id,
+      delivery_man_name: deliveryManName ?? null,
 
       // Format timestamps as ISO UTC for consistency
       created_at: this.formatDateToISO(order.created_at),
@@ -474,7 +500,11 @@ export class OrdersService {
       }
 
       // 11. Format order for frontend
-      const formattedOrder = this.formatOrder(updatedOrder);
+      const lastName = deliveryMan.l_name?.trim();
+      const dmName = [deliveryMan.f_name?.trim(), lastName ? lastName[0] : '']
+        .filter(Boolean)
+        .join(' ');
+      const formattedOrder = this.formatOrder(updatedOrder, dmName);
 
       // 12. Broadcast update via WebSocket
       this.ordersGateway.emitOrderUpdated(restaurantId, formattedOrder);
