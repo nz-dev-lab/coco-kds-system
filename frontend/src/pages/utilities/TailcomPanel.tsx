@@ -262,7 +262,8 @@ export default function TailcomPanel() {
         </p>
       </div>
 
-      {/* Call settings */}
+      {/* Call settings — hidden for now; staff must answer/reject calls manually */}
+      {false && (
       <div className="bg-white dark:bg-kds-bg-secondary rounded-xl border border-slate-200 dark:border-kds-border shadow-sm p-5">
         <h2 className="text-lg font-semibold text-slate-800 dark:text-kds-text-primary mb-4">Call Settings</h2>
         <div className="flex items-center justify-between py-3 border-t border-slate-100 dark:border-kds-border">
@@ -288,6 +289,7 @@ export default function TailcomPanel() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Live worker log */}
       <div className="bg-white dark:bg-kds-bg-secondary rounded-xl border border-slate-200 dark:border-kds-border shadow-sm p-5">

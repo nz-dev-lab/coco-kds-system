@@ -20,7 +20,7 @@ export interface AppConfig {
 const DEFAULTS: AppConfig = {
   tmbill_enabled: true,
   tailcom_enabled: true,
-  tailcom_auto_accept: true,
+  tailcom_auto_accept: false,
 };
 
 const CONFIG_PATH = path.join(app.getPath('userData'), 'config.json');
