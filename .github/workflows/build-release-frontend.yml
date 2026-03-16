@@ -45,6 +45,7 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.RELEASES_PAT }}
           files: frontend/release/*
           repository: nz-dev-lab/coco-kds-releases
           tag_name: ${{ github.ref_name }}
