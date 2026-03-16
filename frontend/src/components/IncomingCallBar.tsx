@@ -2,17 +2,54 @@
 // Global incoming-call overlay — rendered at the app root so it appears on every page.
 // Only mounted when tailcom is enabled (tailcomEnabled flag from preload).
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Phone, PhoneOff } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 type CallState = 'idle' | 'incoming' | 'active';
 
+let ringtone: HTMLAudioElement | null = null;
+try {
+  ringtone = new Audio('./sounds/yo-phone-linging-67788.mp3');
+  ringtone.loop = true;
+  ringtone.volume = 1;
+  ringtone.onerror = () => {
+    console.error('[IncomingCallBar] Failed to load ringtone');
+    ringtone = null;
+  };
+} catch {
+  ringtone = null;
+}
+
 export default function IncomingCallBar() {
   const [callState, setCallState] = useState<CallState>('idle');
+  const ringingRef = useRef(false);
 
-  const handleIncoming  = useCallback(() => setCallState('incoming'), []);
-  const handleStarted   = useCallback(() => setCallState('active'),   []);
-  const handleEnded     = useCallback(() => setCallState('idle'),     []);
+  const startRing = useCallback(() => {
+    if (ringingRef.current) return;
+    ringingRef.current = true;
+    if (!ringtone) {
+      toast.warn('Ringtone unavailable — sound file could not be loaded');
+      return;
+    }
+    ringtone.currentTime = 0;
+    ringtone.play().catch((err) => {
+      console.error('[IncomingCallBar] ringtone.play() failed:', err);
+      toast.warn('Ringtone could not play — incoming call (no audio)');
+    });
+  }, []);
+
+  const stopRing = useCallback(() => {
+    if (!ringingRef.current) return;
+    ringingRef.current = false;
+    if (!ringtone) return;
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }, []);
+
+  const handleIncoming  = useCallback(() => { setCallState('incoming'); startRing(); },  [startRing]);
+  const handleStarted   = useCallback(() => { setCallState('active');   stopRing(); },   [stopRing]);
+  const handleEnded     = useCallback(() => { setCallState('idle');     stopRing(); },   [stopRing]);
 
   useEffect(() => {
     const api = window.electron?.intercom;
@@ -32,6 +69,7 @@ export default function IncomingCallBar() {
   };
 
   const reject = async () => {
+    stopRing();
     await window.electron.intercom.rejectCall();
     setCallState('idle');
   };
