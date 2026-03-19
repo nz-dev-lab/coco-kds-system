@@ -1,6 +1,6 @@
 {
   "name": "kds-frontend",
-  "version": "1.2.19",
+  "version": "1.2.20",
   "description": "CocoFlow - Restaurant Operations Platform",
   "main": "dist-electron/main.js",
   "author": "Nz-Dev-Lab",
@@ -31,10 +31,12 @@
     "date-fns": "^4.1.0",
     "electron-updater": "^6.3.9",
     "html2canvas": "^1.4.1",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.545.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.6.0",
+    "react-leaflet": "^4.2.1",
     "react-redux": "^9.2.0",
     "react-router-dom": "^6.30.1",
     "react-toastify": "^11.0.5",
@@ -45,6 +47,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/bonjour": "^3.5.13",
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^24.7.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

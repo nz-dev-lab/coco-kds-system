@@ -9,6 +9,7 @@ interface UIState {
   selectedStation: string;
   selectedSource: 'all' | 'cocoeats' | 'tmbill';
   theme: 'dark' | 'light';
+  hasSeenTrackingTour: boolean;
   // Transient — order IDs currently showing the new-order animation.
   // Not persisted. Populated by detection points (App.tsx, useTmbillOrders).
   // Cleared by each card after 60 s or on user interaction.
@@ -49,6 +50,7 @@ interface UIState {
       paperWidth: 58 | 80;
       autoPrint: boolean;
     };
+    osrmUrl: string;
     debugMode: boolean;
   };
   focusedOrderId: string | null;
@@ -59,8 +61,8 @@ interface UIState {
 // ============================================
 // ✅ STEP 1: INCREMENT THIS WHEN ADDING NEW SETTINGS
 // ============================================
-// Current version: 10 (added scheduledAlertMinutes to tmbillNotifications)
-const SETTINGS_VERSION = 10;
+// Current version: 11 (added osrmUrl)
+const SETTINGS_VERSION = 11;
 
 // ============================================
 // ✅ STEP 2: ADD NEW FIELDS HERE
@@ -97,6 +99,7 @@ const getDefaultSettings = (): UIState['settings'] => ({
     paperWidth: 80,
     autoPrint: false,
   },
+  osrmUrl: 'http://localhost:5000',
   debugMode: false,
 });
 
@@ -191,6 +194,12 @@ const migrateSettings = (oldSettings: any, oldVersion: number): UIState['setting
     };
   }
 
+  // Migration v10 → v11: Added osrmUrl
+  if (oldVersion < 11) {
+    console.log('📦 Migrating settings v10 → v11: Adding osrmUrl');
+    settings.osrmUrl = 'http://localhost:5000';
+  }
+
   return settings as UIState['settings'];
 };
 
@@ -240,6 +249,7 @@ const initialState: UIState = {
   selectedStation: 'Main Kitchen',
   selectedSource: 'all',
   theme: 'dark',
+  hasSeenTrackingTour: localStorage.getItem('kds-tracking-tour-seen') === 'true',
   flashOrderIds: [],
   settings: loadSettings(),
   focusedOrderId: null,
@@ -457,6 +467,22 @@ const uiSlice = createSlice({
     },
 
     // ========================================
+    // OSRM URL (saves to localStorage)
+    // ========================================
+    setOsrmUrl: (state, action: PayloadAction<string>) => {
+      state.settings.osrmUrl = action.payload;
+      saveSettings(state.settings);
+    },
+
+    // ========================================
+    // Feature Tour (saves to localStorage)
+    // ========================================
+    setHasSeenTrackingTour: (state, action: PayloadAction<boolean>) => {
+      state.hasSeenTrackingTour = action.payload;
+      localStorage.setItem('kds-tracking-tour-seen', action.payload.toString());
+    },
+
+    // ========================================
     // Debug Mode (saves to localStorage)
     // ========================================
     setDebugMode: (state, action: PayloadAction<boolean>) => {
@@ -510,6 +536,8 @@ export const {
   setPaperWidth,
   toggleAutoPrint,
   setKdsHostIp,
+  setOsrmUrl,
+  setHasSeenTrackingTour,
   setDebugMode,
   toggleTmbillNotifications,
   setTmbillNotificationVolume,

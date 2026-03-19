@@ -3,6 +3,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Leaflet: fix Tailwind preflight breaking tile images ── */
+.leaflet-container img.leaflet-tile {
+  max-width: none !important;
+  height: auto;
+}
+.leaflet-container {
+  z-index: 0;
+}
+
 
 @layer base {
   body {

@@ -811,7 +811,11 @@ return (
               <div>
                 <p className="text-sm font-semibold text-purple-900 mb-1 flex items-center gap-2">
                   <Bike className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">Assigned to DM #{order.delivery_man_id}</span>
+                  <span className="truncate">
+                    {order.delivery_man_name
+                      ? `Assigned to ${order.delivery_man_name}`
+                      : `Assigned to DM #${order.delivery_man_id}`}
+                  </span>
                 </p>
                 <p className="text-xs text-purple-700">
                   ⏳ Waiting for pickup via delivery man app

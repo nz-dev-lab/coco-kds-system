@@ -1,6 +1,6 @@
 // src/pages/Settings.tsx
 import { useState, useEffect, useCallback } from 'react';
-import { Volume2, Mic, MicOff, Play, RotateCcw, Type, CaseSensitive, Printer, RefreshCw, Zap, Monitor, Wifi, WifiOff, ScanSearch, Bug } from 'lucide-react';
+import { Volume2, Mic, MicOff, Play, RotateCcw, Type, CaseSensitive, Printer, RefreshCw, Zap, Monitor, Wifi, WifiOff, ScanSearch, Bug, MapPin } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   toggleAudioNotifications,
@@ -17,6 +17,7 @@ import {
   toggleAutoPrint,
   setStationView,
   setKdsHostIp,
+  setOsrmUrl,
   setDebugMode,
   toggleTmbillNotifications,
   setTmbillNotificationVolume,
@@ -49,6 +50,7 @@ export default function Settings() {
   // ── KDS Client section state (kitchen screens) ────────────────────────────
   const isKdsClient = isElectronApp && settings.stationView !== 'all';
   const [kdsHostIpInput, setKdsHostIpInput] = useState<string>(settings.kdsHostIp ?? '');
+  const [osrmUrlInput, setOsrmUrlInput] = useState<string>(settings.osrmUrl ?? 'http://localhost:5000');
 
   // ── Update panel state ────────────────────────────────────────────────────
   type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'ready' | 'error';
@@ -1099,10 +1101,50 @@ export default function Settings() {
         )}
       </div>
 
+      {/* Delivery Tracking */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold text-slate-800 mb-1 flex items-center gap-2">
+          <MapPin className="w-5 h-5" />
+          Delivery Tracking
+        </h2>
+        <p className="text-sm text-slate-500 mb-4">
+          OSRM routing server URL used to calculate delivery routes and ETAs on the Dispatch map.
+        </p>
+        <div className="py-3 border-b">
+          <p className="font-medium text-slate-800 mb-1">OSRM Server URL</p>
+          <p className="text-sm text-slate-500 mb-3">
+            Change to your Tailscale IP when using a remote OSRM instance (e.g. <span className="font-mono text-xs">http://100.x.x.x:5000</span>).
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={osrmUrlInput}
+              onChange={(e) => setOsrmUrlInput(e.target.value)}
+              onBlur={() => dispatch(setOsrmUrl(osrmUrlInput.trim() || 'http://localhost:5000'))}
+              placeholder="http://localhost:5000"
+              className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={() => {
+                const val = 'http://localhost:5000';
+                setOsrmUrlInput(val);
+                dispatch(setOsrmUrl(val));
+              }}
+              className="px-3 py-2 text-sm text-slate-600 hover:text-slate-800 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* App Updates */}
       {isElectronApp && (
-        <div className="bg-white dark:bg-kds-surface rounded-xl p-5 border border-slate-200 dark:border-kds-border">
-          <h3 className="font-semibold text-slate-800 dark:text-kds-text-primary mb-4">App Updates</h3>
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+            <Zap className="w-5 h-5" />
+            App Updates
+          </h2>
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-400">Current version</p>
@@ -1184,15 +1226,30 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Reset Button */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleReset}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors"
-        >
-          <RotateCcw className="w-4 h-4" />
-          Reset to Defaults
-        </button>
+      {/* Reset Settings */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold text-slate-800 mb-1 flex items-center gap-2">
+          <RotateCcw className="w-5 h-5" />
+          Reset Settings
+        </h2>
+        <p className="text-sm text-slate-500 mb-4">
+          Restore all settings to their default values. This cannot be undone.
+        </p>
+        <div className="py-3 border-b">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-slate-800">Reset to Defaults</p>
+              <p className="text-sm text-slate-500">Clears all saved preferences and restores factory defaults</p>
+            </div>
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset to Defaults
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

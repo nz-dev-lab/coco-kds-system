@@ -72,6 +72,7 @@ const navigationItems: NavItem[] = [
 export default function Sidebar() {
   const dispatch = useAppDispatch();
   const sidebarOpen = useAppSelector((state) => state.ui.sidebarOpen);
+  const hasSeenTrackingTour = useAppSelector((state) => state.ui.hasSeenTrackingTour);
   const [version, setVersion] = useState('0.0.0');
 
 useEffect(() => {
@@ -130,6 +131,16 @@ useEffect(() => {
                     <>
                       <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600 dark:text-blue-400' : ''}`} />
                       <span>{item.label}</span>
+                      {item.id === 'dispatch' && !hasSeenTrackingTour && (
+                        <span className="ml-auto flex items-center">
+                          <span className="relative flex">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span className="relative inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500 text-white leading-none">
+                              NEW
+                            </span>
+                          </span>
+                        </span>
+                      )}
                     </>
                   )}
                 </NavLink>

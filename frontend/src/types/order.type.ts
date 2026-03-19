@@ -40,6 +40,7 @@ export interface Order {
   
   // Delivery specific
   delivery_man_id?: string | null;
+  delivery_man_name?: string | null;
   delivery_address?: DeliveryAddress | null;
   customer_name?: string | null;
   

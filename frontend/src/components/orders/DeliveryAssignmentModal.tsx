@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, User, TrendingUp, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 import { useAppSelector } from '@/store/hooks';
+import { formatDmName } from '@/utils/formatDmName';
 
 interface DeliveryMan {
   id: number;
@@ -207,13 +208,13 @@ export default function DeliveryAssignmentModal({
                         {dm.image ? (
                           <img
                             src={buildAssetUrl(dm.image)}
-                            alt={`${dm.f_name} ${dm.l_name}`}
+                            alt={formatDmName(dm.f_name, dm.l_name)}
                             className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
                           />
                         ) : (
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
                             <span className="text-white font-bold text-lg">
-                              {dm.f_name.charAt(0)}{dm.l_name.charAt(0)}
+                              {dm.f_name?.charAt(0)}{dm.l_name?.charAt(0)}
                             </span>
                           </div>
                         )}
@@ -222,7 +223,7 @@ export default function DeliveryAssignmentModal({
                       {/* Info */}
                       <div className="flex-1 text-left min-w-0">
                         <h3 className="font-semibold text-gray-900 truncate">
-                          {dm.f_name} {dm.l_name}
+                          {formatDmName(dm.f_name, dm.l_name)}
                         </h3>
                         <p className="text-sm text-gray-600 truncate">{dm.phone}</p>
                         
@@ -268,8 +269,10 @@ export default function DeliveryAssignmentModal({
           <div className="text-sm text-gray-600">
             {selectedId ? (
               <span className="font-medium text-gray-900">
-                {deliveryMen.find(dm => dm.id === selectedId)?.f_name}{' '}
-                {deliveryMen.find(dm => dm.id === selectedId)?.l_name} selected
+                {formatDmName(
+                  deliveryMen.find(dm => dm.id === selectedId)?.f_name,
+                  deliveryMen.find(dm => dm.id === selectedId)?.l_name,
+                )} selected
               </span>
             ) : (
               'Select a delivery person to continue'
